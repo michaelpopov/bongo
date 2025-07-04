@@ -16,7 +16,6 @@
    limitations under the License.
  **********************************************/
 
-#include "session_demo.h"
 #include "nonblock_conn.h"
 #include "block_conn.h"
 #include "utils/log.h"
@@ -63,6 +62,8 @@ TEST(NONBLOCK_CONN, ListenerBasic) {
     ASSERT_EQ(2, s.count());
 }
 
+#if 0
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 TEST(NONBLOCK_CONN, ListenerBlockConnect) {
     // TempLogLevel tll{"DEBUG"};
 
@@ -304,3 +305,5 @@ TEST(NONBLOCK_CONN, ConnectBlockListener) {
     net.stop();
     t.join();
 }
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+#endif

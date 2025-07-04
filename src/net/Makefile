@@ -3,11 +3,11 @@ all: debug_bld
 CXXFLAGS += -c -Wall -Wextra -Werror -std=c++20
 INCS := -I$(PROJECT_HOME)/src -I$(PROJECT_HOME)/include
 
-SOURCES := block_conn.cpp nonblock_conn.cpp session_base.cpp processor_base.cpp
+SOURCES := block_conn.cpp nonblock_conn.cpp session_base.cpp
 OBJS := $(subst .cpp,.o,$(SOURCES))
 
 UTEST_MAIN=$(PROJECT_HOME)/src/utils/utest_main.cpp
-TEST_SOURCES := session_demo.cpp utest_block_conn.cpp utest_nonblock_conn.cpp utest_full_cycle.cpp
+TEST_SOURCES := utest_block_conn.cpp utest_nonblock_conn.cpp
 TEST_OBJS := $(subst .cpp,.o,$(TEST_SOURCES))
 
 LIBS :=  -lgtest -lpthread

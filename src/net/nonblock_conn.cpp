@@ -17,7 +17,7 @@
  **********************************************/
 
 #include "nonblock_conn.h"
-#include "message.h"
+#include "proc/message.h"
 #include "utils/log.h"
 
 #include <experimental/scope>
@@ -105,7 +105,7 @@ void NonBlockNet::deleteItem(NonBlockBase* nb) {
         NonBlockConnection* conn = static_cast<NonBlockConnection*>(nb);
         NetSession* session = conn->session();
         switch (session->state()) {
-            case NetSessionState::Released:
+            case ItemState::Released:
                 break; // keep going, let's remove this connection.
             default:
                 nb->die();
@@ -440,7 +440,7 @@ void NonBlockNet::onRead(NonBlockConnection* connection) {
     LOG_TRACE << "NonBlockNet::onRead for " << connection->name();
 
     NetSession* session = connection->session();
-    size_t size = session->getSize();
+    size_t size = 1024; //session->getSize();
 
     while (_keepRunning.load()) {
         Buffer buf = session->getReadBuffer(size);
@@ -702,22 +702,25 @@ void NonBlockNet::processPipe() {
             }
         });
 
-        NetSession* session = msg->session();
-        NonBlockConnection* conn = session->parent();
+        NetSession* session = static_cast<NetSession*>(msg->item());
+        assert(session);
+
+        NonBlockConnection* conn = session->connection();
         if (conn->dead()) {
             deleteItem(conn);
             continue;
         }
 
         switch (msg->type()) {
-            case MessageType::SessionReleased:
+            case MessageType::ItemReleased:
                 LOG_TRACE << "NonBlockNet::processPipe: session released";
-                session->setState(_queue, NetSessionState::Released);
+                session->setState(ItemState::Released);
+                session->onRead(_queue);
                 break;
             
             case MessageType::MoreData: {
                 LOG_TRACE << "NonBlockNet::processPipe: more data";
-                session->setState(_queue, NetSessionState::Released);
+                session->setState(ItemState::Released);
                 onWrite(conn);
                 break;
             }

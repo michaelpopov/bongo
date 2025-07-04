@@ -1,7 +1,8 @@
 all: libnet.a utest
 
 CXXFLAGS += -g
-STATIC_LIBS += $(PROJECT_HOME)/lib-dbg/libnet.a \
+STATIC_LIBS += $(PROJECT_HOME)/lib-dbg/libproc.a \
+               $(PROJECT_HOME)/lib-dbg/libnet.a \
                $(PROJECT_HOME)/lib-dbg/libutils.a
 
 %.o : ../%.cpp
