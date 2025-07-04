@@ -47,7 +47,11 @@ PipeQueue::PipeResult PipeQueue::read(void*& ptr) {
 }
 
 PipeQueue::PipeResult PipeQueue::write(void* ptr) {
-    int ret = ::write(pipefd[1], ptr, sizeof(ptr));
+    return write(pipefd[1], ptr);
+}
+
+PipeQueue::PipeResult PipeQueue::write(int fd, void* ptr) {
+    int ret = ::write(fd, ptr, sizeof(ptr));
     if (ret != sizeof(ptr)) {
         return PipeResult{ ret, errno };
     }

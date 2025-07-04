@@ -28,31 +28,8 @@ namespace bongo {
 
 class NonBlockConnection;
 
-/*********************************************************************************
- You will need to create your own NetSession-inherrited class and 
- NetSessionFactory-inherrited class. Then you provide the "factory" class
- as part of operations startListen and startConnect. On accept a new NetSession
- is created using the factory and registered for operations. The same happens
- on completion of a connect operation.
-
- NetSession state machine
-    1) Reading - there is not enough data in the input buffer to complete parsing
-       of a command. Network thread can delete a NetSession object in this state.
-    2) InputQueued - there is a command ready for execution. NetSession object
-       is in the input queue waiting to be picked up for command execution.
-    3) Executing - a working thread picked up the object from the input queue and
-       executing "next command" of the NetSession.
-    4) OutputQueued - a working thread placed the object into an output queue.
-    5) Writing - a network thread picked up the object from the output queue.
-       Network thread can delete the object in this state.
-
-    Reading -> Reading
-    Reading -> deleted
-    Reading -> InputQueued -> Executing -> OutputQueued -> Writing
-    Writing -> Writing
-    Writing -> deleted
-    Writing -> Reading
- */
+class NetSession;
+using SessionsQueue = ThreadQueue<NetSession*>;
 
 struct InputMessage {
     std::vector<char> header;
@@ -76,11 +53,22 @@ private:
 };
 
 enum class NetSessionState {
-    Reading,
-    InputQueued,
-    Executing,
-    OutputQueued,
-    Writing,
+    Released,
+    InProcessing,
+};
+
+struct RequestBase {
+    virtual ~RequestBase() = default;
+};
+
+struct ResponseBase {
+    virtual ~ResponseBase() = default;
+};
+
+enum class ProcessingStatus {
+    Ok,
+    Failed,
+    IncompleteDataSend,
 };
 
 class NetSession {
@@ -91,7 +79,7 @@ public:
     virtual int init() { return 0; }
 
     NetSessionState state() const { return _state; }
-    void setState(NetSessionState state) { _state = state; }
+    virtual void setState(SessionsQueue*, NetSessionState state) { _state = state; }
 
     size_t getSize() const { return _size; }
     void   setSize(size_t size) { _size = size; }
@@ -104,7 +92,7 @@ public:
     Buffer getDataForWriting() { return _writeBuf.getData(); }
     void completedWriting(size_t size) { _writeBuf.used(size); }
 
-    virtual int onRead() { return 0; }
+    virtual int onRead(SessionsQueue*) { return 0; }
     virtual int onWrite() { return 0; }
 
     NonBlockConnection* connection() const { return _conn; }
@@ -116,10 +104,14 @@ public:
 
     void appendForWriting(DataBuffer& buffer) { _writeBuf.append(buffer); }
 
+    // Support for the session's request queue
+    virtual std::optional<RequestBase*> getRequest() { return nullptr; }
+    virtual bool hasRequest() const { return false; }
+    virtual ProcessingStatus sendResponse(const ResponseBase& /*response*/) { return ProcessingStatus::Failed; }
+    virtual bool failed() const { return true; }
+
 protected:
-    // By default the session is an ingress session.
-    // It starts with waiting for the initial data packet from the other side.
-    NetSessionState _state = NetSessionState::Reading;
+    NetSessionState _state = NetSessionState::Released;
 
     NonBlockConnection* _conn;
     DataBuffer _readBuf{1024};

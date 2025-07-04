@@ -1,5 +1,5 @@
 /**********************************************
-   File:   pipe_queue.h
+   File:   processor_base.h
 
    Copyright 2025 Michael Popov
 
@@ -15,25 +15,36 @@
    See the License for the specific language governing permissions and
    limitations under the License.
  **********************************************/
-
 #pragma once
-#include <utility>
+#include "session_base.h"
+#include "utils/log.h"
 
-class PipeQueue {
+namespace bongo {
+
+struct ProcessorStats {
+    std::atomic<size_t> processedCount;
+};
+
+class ProcessorBase {
 public:
-    using PipeResult = std::pair<int, int>; // ret, errno
+    ProcessorBase(SessionsQueue* sessionsQueue, ProcessorStats* stats = nullptr)
+      : _sessionsQueue(sessionsQueue), _stats(stats) {}
 
-    ~PipeQueue();
+    void run();
 
-    PipeResult init();
-    int readFd() const { return pipefd[0]; }
-    int writeFd() const { return pipefd[1]; }
-
-    PipeResult read(void*& ptr);
-    PipeResult write(void* ptr);
-
-    static PipeResult write(int fd, void* ptr);
+protected:
+    virtual ProcessingStatus processRequest(NetSession* /*session*/, RequestBase* /*request*/) {
+        return ProcessingStatus::Failed;
+    }
 
 private:
-    int pipefd[2] = { -1, -1 };
+    SessionsQueue* _sessionsQueue;
+    ProcessorStats* _stats;
+
+private:
+    void processSession(NetSession* session);
+
 };
+
+
+} // namespace bongo

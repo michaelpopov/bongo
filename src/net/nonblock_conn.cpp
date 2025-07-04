@@ -105,8 +105,7 @@ void NonBlockNet::deleteItem(NonBlockBase* nb) {
         NonBlockConnection* conn = static_cast<NonBlockConnection*>(nb);
         NetSession* session = conn->session();
         switch (session->state()) {
-            case NetSessionState::Reading:
-            case NetSessionState::Writing:
+            case NetSessionState::Released:
                 break; // keep going, let's remove this connection.
             default:
                 nb->die();
@@ -368,6 +367,10 @@ void NonBlockNet::on_accept(NonBlockListener* listener) {
             return;
         }
 
+        // Pass a write side of the pipe to the session, so processors will be able
+        // to send messages back to this instance.
+        nb->session()->setPipe(_pipe.writeFd());
+
         LOG_TRACE << "NonBlockNet::on_accept: accepted new connection for " << nb->name();
         onRead(nb);
     }
@@ -398,7 +401,6 @@ void NonBlockNet::on_connect(NonBlockConnector* connector) {
         return;
     }
 
-    nb->session()->setState(NetSessionState::Writing);
     ret = modifyFd(nb->fd(), NetOpType::Write, nb);
     if (ret != 0) {
         LOG_ERROR << "NonBlockNet::on_connect: failed to modify fd";
@@ -438,7 +440,6 @@ void NonBlockNet::onRead(NonBlockConnection* connection) {
     LOG_TRACE << "NonBlockNet::onRead for " << connection->name();
 
     NetSession* session = connection->session();
-    session->setState(NetSessionState::Reading);
     size_t size = session->getSize();
 
     while (_keepRunning.load()) {
@@ -479,7 +480,7 @@ void NonBlockNet::onRead(NonBlockConnection* connection) {
     }
 
     LOG_TRACE << "NonBlockNet::onRead finished reading " << connection->name();
-    int ret = session->onRead();
+    int ret = session->onRead(_queue);
     if (ret != 0) {
         LOG_TRACE << "NonBlockNet::onRead: finish connection: " << connection->name();
         deleteItem(connection);
@@ -513,15 +514,13 @@ void NonBlockNet::onWrite(NonBlockConnection* connection) {
         }
 
         // Switch to writing mode. If needed.
-        if (ret < 0 && session->state() != NetSessionState::Writing) {
+        if (ret < 0) {
             LOG_TRACE << "NonBlockNet::onWrite modify fd to write " << connection->name();
             ret = modifyFd(connection->fd(), NetOpType::Write, connection);
             if (ret != 0) {
                 LOG_TRACE << "NonBlockNet::onWrite: failed to modify to write: " << connection->name();
                 deleteItem(connection);
             }
-
-            session->setState(NetSessionState::Writing);
 
             return;
         }
@@ -550,7 +549,7 @@ void NonBlockNet::onWrite(NonBlockConnection* connection) {
     }
 
     // Switch to reading mode. If needed.
-    if (ret == 0 && session->state() != NetSessionState::Reading) {
+    if (ret == 0) {
         LOG_TRACE << "NonBlockNet::onWrite modify fd to read " << connection->name();
         // TODO: NOT GOOD. Session state and connection state is not the same!!!
         int ret = modifyFd(connection->fd(), NetOpType::Read, connection);
@@ -559,8 +558,6 @@ void NonBlockNet::onWrite(NonBlockConnection* connection) {
             deleteItem(connection);
             return;
         }
-
-        session->setState(NetSessionState::Reading);
     }
 }
 
@@ -698,6 +695,13 @@ void NonBlockNet::processPipe() {
         }
 
         MessageBase* msg = static_cast<MessageBase*>(ptr);
+        assert(msg != nullptr);
+        auto cleanup = std::experimental::scope_exit([&]() {
+            if (msg != nullptr) {
+                delete msg;
+            }
+        });
+
         NetSession* session = msg->session();
         NonBlockConnection* conn = session->parent();
         if (conn->dead()) {
@@ -707,11 +711,13 @@ void NonBlockNet::processPipe() {
 
         switch (msg->type()) {
             case MessageType::SessionReleased:
-                // TODO: if session has an input message, put it on the pipe for execution.
-                //       otherwise - do nothing????
+                LOG_TRACE << "NonBlockNet::processPipe: session released";
+                session->setState(_queue, NetSessionState::Released);
                 break;
             
             case MessageType::MoreData: {
+                LOG_TRACE << "NonBlockNet::processPipe: more data";
+                session->setState(_queue, NetSessionState::Released);
                 onWrite(conn);
                 break;
             }

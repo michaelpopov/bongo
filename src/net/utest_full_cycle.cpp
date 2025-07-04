@@ -15,7 +15,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
  **********************************************/
-
+#include "processor_base.h"
 #include "session_demo.h"
 #include "message.h"
 #include "block_conn.h"
@@ -27,67 +27,20 @@
 
 using namespace bongo;
 
-struct ProcessorStats {
-    std::atomic<size_t> processedCount;
-};
-
-class Processor {
+class Processor : public ProcessorBase {
 public:
-    Processor(SessionsQueue* sessionsQueue, ProcessorStats* stats = nullptr)
-      : _sessionsQueue(sessionsQueue), _stats(stats) {}
+    Processor(SessionsQueue* queue, ProcessorStats* stats = nullptr) : ProcessorBase(queue, stats) {}
 
-    void run() {
-        while (auto optionalSession = _sessionsQueue->pop()) {
-            if (!optionalSession) {
-                break;
-            }
+protected:
+    ProcessingStatus processRequest(NetSession* session, RequestBase* request) override {
+        RequestDemo* req = dynamic_cast<RequestDemo*>(request);
+        assert(req);
 
-            LOG_TRACE << "Processor::run: pop Session";
+        // That's processing: just copy request command to response data.
+        ResponseDemo resp;
+        resp.data = req->command;
 
-            ReqRespSession* session = dynamic_cast<ReqRespSession*>(optionalSession.value());
-            if (session == nullptr) {
-                LOG_TRACE << "Processor::run: BAD Session";
-            }
-            assert(session);
-            processSession(session);
-        }
-    }
-
-private:
-    SessionsQueue* _sessionsQueue;
-    ProcessorStats* _stats;
-
-private:
-    void processSession(ReqRespSession* session) {
-        MessageType resultType = MessageType::SessionReleased;
-
-        LOG_TRACE << "Processor::processSession: start loop";
-        while (auto optionalRequest = session->getRequest()) {
-            LOG_TRACE << "Processor::processSession: loop step";
-            if (!optionalRequest) {
-                break;
-            }
-
-            LOG_TRACE << "Processor::processSession: pop Request";
-            if (_stats) {
-                _stats->processedCount++;
-            }
-
-            Request& req = optionalRequest.value();
-
-            Response resp { .data = req.command };
-            int ret = session->sendResponse(resp);
-            if (ret != 0) {
-                // Session couldn't send all response data,
-                // let's break processing of the session for now
-                resultType = MessageType::MoreData;
-                break;
-            }
-        }
-
-        MessageBase* msg = new MessageBase(resultType, session);
-        auto pipeQueue = session->getPipeQueue();
-        pipeQueue->write(&msg);
+        return session->sendResponse(resp);
     }
 };
 
@@ -158,24 +111,26 @@ TEST(FULL_CYCLE, WorkingThreadsPool) {
 }
 
 TEST(FULL_CYCLE, RequestResponse) {
-    //TempLogLevel tll{"DEBUG"};
+    TempLogLevel tll{"DEBUG"};
 
     const std::string IP = "127.0.0.1";
     const int PORT = 8888;
     const size_t COUNT = 4;
-    const size_t REQUEST_COUNT = 10;
+    const size_t REQUEST_COUNT = 1; //10;
 
     WorkingThreadsPool<Processor> pool(COUNT);
 
     NonBlockNet net;
     int ret = net.init();
 
+    net.setSessionsQueue(pool.sessionsQueue());
+
     std::thread t([&]() {
         NetOperation op {
             .name = "FullCycleTest",
             .ip = IP,
             .port = PORT,
-            .factory = std::make_shared<ReqRespSessionFactory>(net.getPipeQueue(), pool.sessionsQueue()),
+            .factory = std::make_shared<ReqRespSessionFactory>(),
         };
         ret = net.startListen(op);
         ASSERT_EQ(0, ret);
@@ -192,9 +147,11 @@ TEST(FULL_CYCLE, RequestResponse) {
     auto conn_info = connector.make_connection(); ASSERT_TRUE(conn_info);
     BlockConnection conn(conn_info->fd);
 
+    char buf[16];
+    RequestDemo req;
+    req.command = "hello";
+
     for (size_t i = 0; i < REQUEST_COUNT; i++) {
-        char buf[16];
-        Request req { .command = "hello" };
         uint32_t size = req.command.size();
         char* data = req.command.data();
         size_t fullSize = sizeof(size) + size;

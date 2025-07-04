@@ -100,7 +100,6 @@ struct NetOperation {
 };
 
 enum class NetOpType { Read, Write };
-using SessionsQueue = ThreadQueue<NetSession*>;
 
 class NonBlockNet {
     friend class NonBlockConnection;

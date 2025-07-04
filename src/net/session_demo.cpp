@@ -22,13 +22,14 @@
 #include <assert.h>
 #include <string.h>
 #include <iostream>
+#include <experimental/scope>
 
 namespace bongo {
 
 /*******************************************************************************
  *   EchoNetSession
  */
-int EchoNetSession::onRead() {
+int EchoNetSession::onRead(SessionsQueue*) {
     LOG_TRACE << "EchoNetSession::onRead enter";
 
     Buffer src = _readBuf.getData();
@@ -79,7 +80,7 @@ int BigWriterNetSession::init() {
     return 0;
 }
 
-int BigWriterNetSession::onRead() {
+int BigWriterNetSession::onRead(SessionsQueue*) {
     Buffer src = _readBuf.getData();
     if (src.size < sizeof(size_t)) {
         LOG_TRACE << "BigWriterNetSession::onRead not enough data";
@@ -100,27 +101,46 @@ int BigWriterNetSession::onRead() {
 /*******************************************************************************
  *   ReqRespSession
  */
-int ReqRespSession::onRead() {
+
+void ReqRespSession::setState(SessionsQueue* queue, NetSessionState state) {
+    NetSession::setState(queue, state);
+
+    // If the session is already in processing state, let processor
+    // to handle it.
+    if (_state != NetSessionState::Released) {
+        return;
+    }
+
+    // If the session is in the Released state, let's pass it to
+    // processing.
+    if (!_inputQueue.empty()) {
+        LOG_TRACE << "ReqRespSession::setState:  push session";
+        _state = NetSessionState::InProcessing;
+        queue->push(this);
+    }
+}
+
+int ReqRespSession::onRead(SessionsQueue* queue) {
     processReadBufferData();
 
     // If the session is already in processing state, let processor
     // to handle it.
-    if (_state != NetSessionState::Reading) {
+    if (_state != NetSessionState::Released) {
         return 0;
     }
 
-    // If the session is in the Reading state, let's pass it to
+    // If the session is in the Released state, let's pass it to
     // processing.
     if (!_inputQueue.empty()) {
-        _state = NetSessionState::InputQueued; // ??? TODO: Not sure
         LOG_TRACE << "ReqRespSession::onRead:  push session";
-        _sessionsQueue->push(this);
+        _state = NetSessionState::InProcessing;
+        queue->push(this);
     }
 
     return 0;
 }
 
-std::optional<Request> ReqRespSession::getRequest() {
+std::optional<RequestBase*> ReqRespSession::getRequest() {
     LOG_TRACE << "ReqRespSession::getRequest: enter";
 
     InputMessagePtr msg = _inputQueue.pop();
@@ -128,6 +148,12 @@ std::optional<Request> ReqRespSession::getRequest() {
         LOG_TRACE << "ReqRespSession::getRequest: no requests";
         return {};
     }
+
+    auto cleanup = std::experimental::scope_exit([&]() {
+        if (msg != nullptr) {
+            delete msg;
+        }
+    });
 
     LOG_TRACE << "ReqRespSession::getRequest: get request";
 
@@ -148,12 +174,14 @@ std::optional<Request> ReqRespSession::getRequest() {
         return {};
     }
 
-    Request req;
-    req.command.assign(msg->body.data(), msg->body.size());
+    RequestDemo* req = new RequestDemo;
+    req->command.assign(msg->body.data(), msg->body.size());
     return req;
 }
 
-int ReqRespSession::sendResponse(const Response& resp) {
+ProcessingStatus ReqRespSession::sendResponse(const ResponseBase& response) {
+    const ResponseDemo& resp = dynamic_cast<const ResponseDemo&>(response);
+
     size_t serializedSize = sizeof(uint32_t) + resp.data.size();
     Buffer dest = _writeBuf.getAvailable(serializedSize);
 
@@ -163,23 +191,14 @@ int ReqRespSession::sendResponse(const Response& resp) {
 
     _writeBuf.update(serializedSize);
 
-    {
-        Buffer check = _writeBuf.getData();
-        assert(check.size == serializedSize);
-        uint32_t checkSize;
-        memcpy(&checkSize, check.ptr, sizeof(checkSize));
-        assert(checkSize == size);
-        std::string s(check.ptr + sizeof(checkSize), checkSize);
-        assert(s == resp.data);
-    }
-
     _conn->writeData();
 
     if (_writeBuf.size() > 0) {
-        return 1;
+        LOG_TRACE << "ReqRespSession::sendResponse: more data";
+        return ProcessingStatus::IncompleteDataSend;
     }
 
-    return 0;
+    return ProcessingStatus::Ok;
 }
 
 size_t ReqRespSession::parseMessageSize(Buffer header) {

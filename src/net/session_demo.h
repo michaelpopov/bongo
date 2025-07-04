@@ -45,7 +45,7 @@ public:
 class EchoNetSession : public NetSession {
 public:
     EchoNetSession(NonBlockConnection* conn, size_t size) : NetSession(conn) { _size = size; }
-    int onRead() override;
+    int onRead(SessionsQueue*) override;
 };
     
 class EchoNetSessionFactory : public NetSessionFactory {
@@ -63,7 +63,7 @@ class BigWriterNetSession : public NetSession {
 public:
     BigWriterNetSession(NonBlockConnection* conn) : NetSession(conn) {}
     int init() override;
-    int onRead() override;
+    int onRead(SessionsQueue*) override;
 
 private:
     const size_t BIG_SIZE = 100 * 1024 * 1024;
@@ -83,51 +83,39 @@ public:
  *   
  */
 
-struct Request {
+struct RequestDemo : public RequestBase {
     std::string command;
 };
 
-struct Response {
+struct ResponseDemo : public ResponseBase {
     std::string data;
 };
 
 class ReqRespSession : public NetSession {
 public:
-    ReqRespSession(NonBlockConnection* conn, PipeQueue* pipeQueue, SessionsQueue* sessionsQueue)
-     : NetSession(conn), _pipeQueue(pipeQueue), _sessionsQueue(sessionsQueue)
+    ReqRespSession(NonBlockConnection* conn)
+     : NetSession(conn)
     {
-        assert(_pipeQueue);
-        assert(_sessionsQueue);
         _headerSize = 4;
         _maxBodySize = 128;
     }
 
-    int onRead() override;
-    std::optional<Request> getRequest();
-    int sendResponse(const Response& resp);
-    PipeQueue* getPipeQueue() { return _pipeQueue; }
+    void setState(SessionsQueue* queue, NetSessionState state) override;
+    int onRead(SessionsQueue*) override;
+
+    std::optional<RequestBase*> getRequest() override;
+    ProcessingStatus sendResponse(const ResponseBase& resp) override;
 
 protected:
     virtual size_t parseMessageSize(Buffer header) override;
 
-private:
-    PipeQueue* _pipeQueue;
-    SessionsQueue* _sessionsQueue;
 };
     
 class ReqRespSessionFactory : public NetSessionFactory {
 public:
-    ReqRespSessionFactory(PipeQueue* pipeQueue, SessionsQueue* sessionsQueue)
-      : _pipeQueue(pipeQueue),
-        _sessionsQueue(sessionsQueue) {}
-
     NetSession* makeSession(NonBlockConnection* conn) override {
-        return new ReqRespSession(conn, _pipeQueue, _sessionsQueue);
+        return new ReqRespSession(conn);
     }
-
-private:
-    PipeQueue* _pipeQueue;
-    SessionsQueue* _sessionsQueue;
 };
 
 
