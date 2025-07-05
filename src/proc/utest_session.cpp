@@ -27,13 +27,9 @@ using namespace bongo;
 
 TEST(SESSION, MirrorBasic) {
     TempLogLevel tll{"DEBUG"};
-    
+
     MessageBase* msg = nullptr;
     MirrorSession* session = nullptr;
-    auto cleanup = std::experimental::scope_exit([&]() {
-        delete msg;
-        delete session;
-    });
 
     PipeQueue pipeQueue;
     auto pipeQueueRet = pipeQueue.init();
@@ -43,33 +39,44 @@ TEST(SESSION, MirrorBasic) {
     pool.start();
     SessionsQueue* sessionsQueue = pool.sessionsQueue();
 
-    session = new MirrorSession;
-    session->setPipe(pipeQueue.writeFd());
-    ASSERT_EQ(SessionState::Released, session->state());
+    std::vector<std::string> inputs = {
+        "Hello, world!",
+        "",
+    };
 
-    const std::string inputStr = "Hello, world!";
-    const uint32_t len = inputStr.length();
-    const size_t dataSize = sizeof(uint32_t) + len;
-    Buffer readBuffer = session->getReadBuffer(dataSize);
-    memcpy(readBuffer.ptr, &len, sizeof(len));
-    memcpy(readBuffer.ptr + sizeof(len), inputStr.data(), len);
-    session->updateReadBuffer(dataSize);
+    for (const auto& inputStr: inputs) {
+        auto cleanup = std::experimental::scope_exit([&]() {
+            delete msg;
+            delete session;
+        });
 
-    session->onRead(sessionsQueue);
-    ASSERT_EQ(SessionState::InProcessing, session->state());
+        session = new MirrorSession;
+        session->setPipe(pipeQueue.writeFd());
+        ASSERT_EQ(SessionState::Released, session->state());
 
-    void* ptr = nullptr;
-    pipeQueue.read(ptr);
-    msg = static_cast<MessageBase*>(ptr);
-    ASSERT_NE(nullptr, msg);
-    ASSERT_EQ(MessageType::SessionReleased, msg->type());
-    ASSERT_EQ(session, msg->session());
+        const uint32_t len = inputStr.length();
+        const size_t dataSize = sizeof(uint32_t) + len;
+        Buffer readBuffer = session->getReadBuffer(dataSize);
+        memcpy(readBuffer.ptr, &len, sizeof(len));
+        memcpy(readBuffer.ptr + sizeof(len), inputStr.data(), len);
+        session->updateReadBuffer(dataSize);
 
-    Buffer writeBuffer = session->getWriteBuffer(1024);
-    ASSERT_EQ(readBuffer.size, writeBuffer.size);
-    uint32_t checkLength = 0;
-    memcpy(&checkLength, writeBuffer.ptr, sizeof(checkLength));
-    std::string outputStr(writeBuffer.ptr + sizeof(checkLength), writeBuffer.size - sizeof(checkLength));
-    ASSERT_EQ(len, checkLength);
-    ASSERT_EQ(inputStr, outputStr);
+        session->onRead(sessionsQueue);
+        ASSERT_EQ(SessionState::InProcessing, session->state());
+
+        void* ptr = nullptr;
+        pipeQueue.read(ptr);
+        msg = static_cast<MessageBase*>(ptr);
+        ASSERT_NE(nullptr, msg);
+        ASSERT_EQ(MessageType::SessionReleased, msg->type());
+        ASSERT_EQ(session, msg->session());
+
+        Buffer writeBuffer = session->getDataForWriting();
+        uint32_t checkLength = 0;
+        memcpy(&checkLength, writeBuffer.ptr, sizeof(checkLength));
+        std::string outputStr(writeBuffer.ptr + sizeof(checkLength), writeBuffer.size - sizeof(checkLength));
+        ASSERT_EQ(len, checkLength);
+        ASSERT_EQ(inputStr, outputStr);
+        session->completedWriting(writeBuffer.size);
+    }
 }

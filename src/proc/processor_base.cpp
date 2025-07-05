@@ -30,8 +30,6 @@ void ProcessorBase::run() {
             break;
         }
 
-        LOG_TRACE << "ProcessorBase::run: pop Session";
-
         auto session = optionalSession.value();
         if (session == nullptr) {
             LOG_TRACE << "ProcessorBase::run: BAD Session";
@@ -46,9 +44,7 @@ void ProcessorBase::processSession(SessionBase* session) {
     MessageType resultType = MessageType::SessionReleased;
     ProcessingStatus status = ProcessingStatus::Failed;
 
-    LOG_TRACE << "ProcessorBase::processSession: start loop";
     while (auto optionalRequest = session->getRequest()) {
-        LOG_TRACE << "ProcessorBase::processSession: loop step";
         if (!optionalRequest) {
             break;
         }
@@ -58,7 +54,6 @@ void ProcessorBase::processSession(SessionBase* session) {
             delete optionalRequest.value();
         });
 
-        LOG_TRACE << "ProcessorBase::processSession: pop Request";
         if (_stats) {
             _stats->processedCount++;
         }

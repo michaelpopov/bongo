@@ -32,21 +32,20 @@ MirrorSession::MirrorSession() {
 ProcessingStatus MirrorSession::sendResponse(const ResponseBase& response) {
     const MirrorResponse& resp = dynamic_cast<const MirrorResponse&>(response);
 
-    size_t serializedSize = sizeof(uint32_t) + resp.output.size();
+    uint32_t len = resp.output.length();
+    size_t serializedSize = sizeof(len) + resp.output.length();
     Buffer dest = _writeBuf.getAvailable(serializedSize);
 
-    uint32_t size = resp.output.size();
-    memcpy(dest.ptr, &size, sizeof(size));
-    memcpy(dest.ptr + sizeof(size), resp.output.data(), size);
+    memcpy(dest.ptr, &len, sizeof(len));
+    memcpy(dest.ptr + sizeof(len), resp.output.data(), len);
 
     _writeBuf.update(serializedSize);
     return ProcessingStatus::Ok;
 }
 
 size_t MirrorSession::parseMessageSize(Buffer header) { 
-    LOG_TRACE << "MirrorSession::parseMessageSize: header.size=" << header.size;
     uint32_t size = -1;
-    assert(header.size == sizeof(size));
+    assert(header.size >= sizeof(size));
     memcpy(&size, header.ptr, sizeof(size));
     return size;
 }

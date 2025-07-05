@@ -80,11 +80,8 @@ public:
     Buffer getReadBuffer(size_t size) { return _readBuf.getAvailable(size); }
     void updateReadBuffer(size_t size) { _readBuf.update(size); }
 
-    Buffer getWriteBuffer(size_t size) { return _writeBuf.getAvailable(size); }
-
     Buffer getDataForWriting() { return _writeBuf.getData(); }
     void completedWriting(size_t size) { _writeBuf.used(size); }
-    void appendForWriting(DataBuffer& buffer) { _writeBuf.append(buffer); }
 
     virtual int onRead(SessionsQueue* session);
     virtual int onWrite() { return 0; }

@@ -66,8 +66,6 @@ void SessionBase::processReadBufferData() {
             return;
         }
 
-        LOG_TRACE << "SessionBase::process:  size=" << size;
-
         // Check is there a whole request body in the buffer
         if (src.size < size + _headerSize) {
             break;
