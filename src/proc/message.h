@@ -20,7 +20,7 @@
 
 namespace bongo {
 
-class ProcessorItem;
+class SessionBase;
 
 enum class MessageType {
     ItemReleased,
@@ -30,23 +30,23 @@ enum class MessageType {
 
 class MessageBase {
 public:
-    MessageBase(MessageType type, ProcessorItem* item) : _type(type), _item(item) {}
+    MessageBase(MessageType type, SessionBase* session) : _type(type), _session(session) {}
     virtual ~MessageBase() = default;
 
     MessageType type() const { return _type; }
-    ProcessorItem* item() const { return _item; }
+    SessionBase* session() const { return _session; }
 
 private:
     MessageType _type;
-    ProcessorItem* _item;
+    SessionBase* _session;
 };
 
 /*******************************************************************************
  * DON'T BOTHER WITH THIS YET!!!
 class MessagePushData : public MessageBase {
 public:
-    MessagePushData(ProcessorItem* item, DataBuffer& buffer)
-      : MessageBase(MessageType::PushData, item) {
+    MessagePushData(SessionBase* session, DataBuffer& buffer)
+      : MessageBase(MessageType::PushData, session) {
         _buffer.swap(buffer);
     }
 

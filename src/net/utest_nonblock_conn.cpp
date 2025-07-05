@@ -29,7 +29,7 @@ using namespace bongo;
 
 TEST(NONBLOCK_CONN, CtorDtor) {
     NonBlockNet net;
-    ASSERT_EQ(0, net.itemsCount());
+    ASSERT_EQ(0, net.sessionsCount());
     auto s = net.stats();
     ASSERT_FALSE(s.ready);
     ASSERT_EQ(0, s.acceptedCount);

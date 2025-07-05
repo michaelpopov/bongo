@@ -17,7 +17,7 @@
  **********************************************/
 
 #pragma once
-#include "session_base.h"
+#include "net_session.h"
 #include "utils/pipe_queue.h"
 #include "utils/thread_queue.h"
 #include <string>
@@ -133,7 +133,7 @@ public:
     };
 
     Stats stats() const { return _stats; }
-    size_t itemsCount() const { return _items.size(); }
+    size_t sessionsCount() const { return _sessions.size(); }
 
     void setSessionsQueue(SessionsQueue* queue) { _queue = queue; }
     PipeQueue* getPipeQueue() { return &_pipe; }
@@ -141,7 +141,7 @@ public:
 private:
     int _fd = -1;
     std::vector<epoll_event> _evsvec;
-    std::unordered_set<NonBlockBase*> _items;
+    std::unordered_set<NonBlockBase*> _sessions;
     Stats _stats;
     std::atomic<bool> _keepRunning = false;
     PipeQueue _pipe;

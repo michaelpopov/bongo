@@ -63,10 +63,10 @@ NonBlockNet::~NonBlockNet() {
         close(_fd);
     }
 
-    for (auto& nb: _items) {
+    for (auto& nb: _sessions) {
         clearItem(nb);
     }
-    _items.clear();
+    _sessions.clear();
 }
 
 int NonBlockNet::init(size_t slotsCount) {
@@ -98,8 +98,8 @@ int NonBlockNet::init(size_t slotsCount) {
 }
 
 void NonBlockNet::deleteItem(NonBlockBase* nb) {
-    assert(_items.find(nb) != _items.end());
-    assert(_stats.count() == itemsCount());
+    assert(_sessions.find(nb) != _sessions.end());
+    assert(_stats.count() == sessionsCount());
 
     if (nb->type() == NonBlockFdType::Connection) {
         NonBlockConnection* conn = static_cast<NonBlockConnection*>(nb);
@@ -113,7 +113,7 @@ void NonBlockNet::deleteItem(NonBlockBase* nb) {
         }
     }
 
-    _items.erase(nb);
+    _sessions.erase(nb);
     clearItem(nb);
 }
 
@@ -142,8 +142,8 @@ void NonBlockNet::addItem(NonBlockBase* nb) {
         case NonBlockFdType::PipeQueue: _stats.pipesCount++; break;
     }
 
-    _items.insert(nb);
-    assert(_stats.count() == itemsCount());
+    _sessions.insert(nb);
+    assert(_stats.count() == sessionsCount());
 }
 
 int NonBlockNet::setNonBlocking(int fd) {
@@ -197,7 +197,7 @@ int NonBlockNet::modifyFd(int fd, NetOpType opType, NonBlockBase* nb) {
     }   
 
     LOG_TRACE << "NonBlockNet::modifyFd: type " << ((opType == NetOpType::Read) ? "EPOLLIN" : "EPOLLOUT");
-    assert(_stats.count() == itemsCount());
+    assert(_stats.count() == sessionsCount());
     return 0;
 }
 
@@ -210,7 +210,7 @@ void NonBlockNet::unregisterFd(int fd) {
         return;
     }   
 
-    assert(_stats.count() == itemsCount());
+    assert(_stats.count() == sessionsCount());
 }
 
 int NonBlockNet::startListen(const NetOperation& op) {
@@ -702,7 +702,7 @@ void NonBlockNet::processPipe() {
             }
         });
 
-        NetSession* session = static_cast<NetSession*>(msg->item());
+        NetSession* session = static_cast<NetSession*>(msg->session());
         assert(session);
 
         NonBlockConnection* conn = session->connection();

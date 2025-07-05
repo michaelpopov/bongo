@@ -16,13 +16,10 @@
    limitations under the License.
  **********************************************/
 #pragma once
-#include "processor_item.h"
-#include "utils/thread_queue.h"
+#include "session_base.h"
 #include <atomic>
 
 namespace bongo {
-
-using ItemsQueue = ThreadQueue<ProcessorItem*>;
 
 struct ProcessorStats {
     std::atomic<size_t> processedCount;
@@ -30,22 +27,22 @@ struct ProcessorStats {
 
 class ProcessorBase {
 public:
-    ProcessorBase(ItemsQueue* itemsQueue, ProcessorStats* stats = nullptr)
-      : _itemsQueue(itemsQueue), _stats(stats) {}
+    ProcessorBase(ItemsQueue* sessionsQueue, ProcessorStats* stats = nullptr)
+      : _sessionsQueue(sessionsQueue), _stats(stats) {}
 
     void run();
 
 protected:
-    virtual ProcessingStatus processRequest(ProcessorItem* /*item*/, RequestBase* /*request*/) {
+    virtual ProcessingStatus processRequest(SessionBase* /*session*/, RequestBase* /*request*/) {
         return ProcessingStatus::Failed;
     }
 
 private:
-    ItemsQueue* _itemsQueue;
+    ItemsQueue* _sessionsQueue;
     ProcessorStats* _stats;
 
 private:
-    void processSession(ProcessorItem* item);
+    void processSession(SessionBase* session);
 
 };
 

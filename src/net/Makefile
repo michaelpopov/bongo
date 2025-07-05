@@ -3,7 +3,7 @@ all: debug_bld
 CXXFLAGS += -c -Wall -Wextra -Werror -std=c++20
 INCS := -I$(PROJECT_HOME)/src -I$(PROJECT_HOME)/include
 
-SOURCES := block_conn.cpp nonblock_conn.cpp session_base.cpp
+SOURCES := block_conn.cpp nonblock_conn.cpp net_session.cpp
 OBJS := $(subst .cpp,.o,$(SOURCES))
 
 UTEST_MAIN=$(PROJECT_HOME)/src/utils/utest_main.cpp

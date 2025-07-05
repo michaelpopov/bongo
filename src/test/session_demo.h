@@ -17,7 +17,7 @@
  **********************************************/
 
 #pragma once
-#include "net/session_base.h"
+#include "net/net_session.h"
 #include "net/nonblock_conn.h"
 #include <mutex>
 #include <list>

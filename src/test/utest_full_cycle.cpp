@@ -17,10 +17,10 @@
  **********************************************/
 #include "proc/processor_base.h"
 #include "proc/message.h"
+#include "proc/thread_pool.h"
 #include "session_demo.h"
 #include "net/block_conn.h"
 #include "utils/log.h"
-#include "utils/thread_pool.h"
 #include "gtest/gtest.h"
 #include <atomic>
 #include <chrono>
@@ -33,7 +33,7 @@ public:
     Processor(ItemsQueue* queue, ProcessorStats* stats = nullptr) : ProcessorBase(queue, stats) {}
 
 protected:
-    ProcessingStatus processRequest(ProcessorItem* item, RequestBase* request) override {
+    ProcessingStatus processRequest(SessionBase* session, RequestBase* request) override {
         RequestDemo* req = dynamic_cast<RequestDemo*>(request);
         assert(req);
 
@@ -41,7 +41,6 @@ protected:
         ResponseDemo resp;
         resp.data = req->command;
 
-        NetSession* session = dynamic_cast<NetSession*>(item);
         assert(session);
         return session->sendResponse(resp);
     }
@@ -51,19 +50,19 @@ TEST(FULL_CYCLE, ProcessorsControl) {
     // TempLogLevel tll{"DEBUG"};
 
     const size_t COUNT = 4;
-    ItemsQueue itemsQueue;
+    ItemsQueue sessionsQueue;
 
-    auto processorFunc = [](ItemsQueue* itemsQueue) {
-        Processor processor(itemsQueue);
+    auto processorFunc = [](ItemsQueue* sessionsQueue) {
+        Processor processor(sessionsQueue);
         processor.run();
     };
 
     std::vector<std::thread> workingThreads;
     for (size_t i = 0; i < COUNT; i++) {
-        workingThreads.emplace_back(std::thread{processorFunc, &itemsQueue});
+        workingThreads.emplace_back(std::thread{processorFunc, &sessionsQueue});
     }
 
-    itemsQueue.shutdown();
+    sessionsQueue.shutdown();
     for (auto& t: workingThreads) {
         t.join();
     }
@@ -89,7 +88,7 @@ TEST(FULL_CYCLE, RequestResponse) {
     NonBlockNet net;
     int ret = net.init();
 
-    SessionsQueue* sessionsQueue = reinterpret_cast<SessionsQueue*>(pool.itemsQueue());
+    SessionsQueue* sessionsQueue = reinterpret_cast<SessionsQueue*>(pool.sessionsQueue());
     net.setSessionsQueue(sessionsQueue);
 
     std::thread t([&]() {

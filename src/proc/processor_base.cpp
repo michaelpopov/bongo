@@ -26,29 +26,29 @@
 namespace bongo {
 
 void ProcessorBase::run() {
-    while (auto optionalSession = _itemsQueue->pop()) {
+    while (auto optionalSession = _sessionsQueue->pop()) {
         if (!optionalSession) {
             break;
         }
 
         LOG_TRACE << "ProcessorBase::run: pop Session";
 
-        auto item = optionalSession.value();
-        if (item == nullptr) {
+        auto session = optionalSession.value();
+        if (session == nullptr) {
             LOG_TRACE << "ProcessorBase::run: BAD Session";
             break;
         }
     
-        processSession(item);
+        processSession(session);
     }
 }
 
-void ProcessorBase::processSession(ProcessorItem* item) {
+void ProcessorBase::processSession(SessionBase* session) {
     MessageType resultType = MessageType::ItemReleased;
     ProcessingStatus status = ProcessingStatus::Failed;
 
     LOG_TRACE << "ProcessorBase::processSession: start loop";
-    while (auto optionalRequest = item->getRequest()) {
+    while (auto optionalRequest = session->getRequest()) {
         LOG_TRACE << "ProcessorBase::processSession: loop step";
         if (!optionalRequest) {
             break;
@@ -64,19 +64,19 @@ void ProcessorBase::processSession(ProcessorItem* item) {
             _stats->processedCount++;
         }
 
-        status = processRequest(item, optionalRequest.value());
+        status = processRequest(session, optionalRequest.value());
         if (status != ProcessingStatus::Ok) {
             break;
         }
     }
 
-    if (item->failed() || !item->hasRequest() || status != ProcessingStatus::Ok) {
-        // Notify the network thread that item is released.
-        MessageBase* msg = new MessageBase(resultType, item);
-        PipeQueue::write(item->getPipe(), &msg);
+    if (session->failed() || !session->hasRequest() || status != ProcessingStatus::Ok) {
+        // Notify the network thread that session is released.
+        MessageBase* msg = new MessageBase(resultType, session);
+        PipeQueue::write(session->getPipe(), &msg);
     } else {
-        // Return the item to the queue for further processing.
-        _itemsQueue->push(item);
+        // Return the session to the queue for further processing.
+        _sessionsQueue->push(session);
     }
 }
 
