@@ -32,7 +32,7 @@ void ProcessorBase::run() {
 
         auto session = optionalSession.value();
         if (session == nullptr) {
-            LOG_TRACE << "ProcessorBase::run: BAD Session";
+            LOG_ERROR << "ProcessorBase::run: BAD Session";
             break;
         }
     
