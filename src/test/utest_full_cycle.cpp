@@ -30,7 +30,7 @@ using namespace bongo;
 
 class Processor : public ProcessorBase {
 public:
-    Processor(ItemsQueue* queue, ProcessorStats* stats = nullptr) : ProcessorBase(queue, stats) {}
+    Processor(SessionsQueue* queue, ProcessorStats* stats = nullptr) : ProcessorBase(queue, stats) {}
 
 protected:
     ProcessingStatus processRequest(SessionBase* session, RequestBase* request) override {
@@ -50,9 +50,9 @@ TEST(FULL_CYCLE, ProcessorsControl) {
     // TempLogLevel tll{"DEBUG"};
 
     const size_t COUNT = 4;
-    ItemsQueue sessionsQueue;
+    SessionsQueue sessionsQueue;
 
-    auto processorFunc = [](ItemsQueue* sessionsQueue) {
+    auto processorFunc = [](SessionsQueue* sessionsQueue) {
         Processor processor(sessionsQueue);
         processor.run();
     };
@@ -76,7 +76,7 @@ TEST(FULL_CYCLE, WorkingThreadsPool) {
 }
 
 TEST(FULL_CYCLE, RequestResponse) {
-    TempLogLevel tll{"DEBUG"};
+    // TempLogLevel tll{"DEBUG"};
 
     const std::string IP = "127.0.0.1";
     const int PORT = 8888;
@@ -88,7 +88,7 @@ TEST(FULL_CYCLE, RequestResponse) {
     NonBlockNet net;
     int ret = net.init();
 
-    SessionsQueue* sessionsQueue = reinterpret_cast<SessionsQueue*>(pool.sessionsQueue());
+    SessionsQueue* sessionsQueue = pool.sessionsQueue();
     net.setSessionsQueue(sessionsQueue);
 
     std::thread t([&]() {

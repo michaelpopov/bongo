@@ -20,7 +20,6 @@
 #include "utils/log.h"
 #include "utils/pipe_queue.h"
 #include <experimental/scope>
-
 #include <assert.h>
 
 namespace bongo {
@@ -44,7 +43,7 @@ void ProcessorBase::run() {
 }
 
 void ProcessorBase::processSession(SessionBase* session) {
-    MessageType resultType = MessageType::ItemReleased;
+    MessageType resultType = MessageType::SessionReleased;
     ProcessingStatus status = ProcessingStatus::Failed;
 
     LOG_TRACE << "ProcessorBase::processSession: start loop";

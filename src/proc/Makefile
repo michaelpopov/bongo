@@ -7,7 +7,7 @@ SOURCES := processor_base.cpp session_base.cpp
 OBJS := $(subst .cpp,.o,$(SOURCES))
 
 UTEST_MAIN=$(PROJECT_HOME)/src/utils/utest_main.cpp
-TEST_SOURCES := 
+TEST_SOURCES := mirror_test.cpp utest_session.cpp
 TEST_OBJS := $(subst .cpp,.o,$(TEST_SOURCES))
 
 LIBS :=  -lgtest -lpthread

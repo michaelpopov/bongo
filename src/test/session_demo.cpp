@@ -101,48 +101,8 @@ int BigWriterNetSession::onRead(SessionsQueue*) {
 /*******************************************************************************
  *   ReqRespSession
  */
-
-int ReqRespSession::onRead(SessionsQueue* queue) {
-    processReadBufferData();
-
-    // If the session is already in processing state, let processor
-    // to handle it.
-    if (_state != ItemState::Released) {
-        return 0;
-    }
-
-    // If the session is in the Released state, let's pass it to
-    // processing.
-    if (!_inputQueue.empty()) {
-        LOG_TRACE << "ReqRespSession::onRead:  push session";
-        _state = ItemState::InProcessing;
-        queue->push(this);
-    }
-
-    return 0;
-}
-
-std::optional<RequestBase*> ReqRespSession::getRequest() {
-    LOG_TRACE << "ReqRespSession::getRequest: enter";
-
-    InputMessagePtr msg = _inputQueue.pop();
-    if (msg == nullptr) {
-        LOG_TRACE << "ReqRespSession::getRequest: no requests";
-        return {};
-    }
-
-    auto cleanup = std::experimental::scope_exit([&]() {
-        if (msg != nullptr) {
-            delete msg;
-        }
-    });
-
-    LOG_TRACE << "ReqRespSession::getRequest: get request";
-
-    // Parsing of the protocol request
-
+std::optional<RequestBase*> ReqRespSession::parseMessage(const InputMessagePtr& msg) {
     if (msg->header.size() != sizeof(uint32_t)) {
-        LOG_TRACE << "ReqRespSession::getRequest: invalid header";
         // TODO: KILL SESSION HERE!!!
         return {};
     }
@@ -151,7 +111,6 @@ std::optional<RequestBase*> ReqRespSession::getRequest() {
     memcpy(&size, msg->header.data(), sizeof(uint32_t));
 
     if (msg->body.size() != size) {
-        LOG_TRACE << "ReqRespSession::getRequest: invalid body";
         // TODO: KILL SESSION HERE!!!
         return {};
     }

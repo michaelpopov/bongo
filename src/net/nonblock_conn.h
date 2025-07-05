@@ -161,9 +161,9 @@ private:
 
     int setNonBlocking(int fd);
 
-    void deleteItem(NonBlockBase* nb);
-    void clearItem(NonBlockBase* nb);
-    void addItem(NonBlockBase* nb);
+    void deleteSession(NonBlockBase* nb);
+    void clearSession(NonBlockBase* nb);
+    void addSession(NonBlockBase* nb);
 
     void processPipe();
 };

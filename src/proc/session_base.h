@@ -26,7 +26,7 @@
 namespace bongo {
 
 class SessionBase;
-using ItemsQueue = ThreadQueue<SessionBase*>;
+using SessionsQueue = ThreadQueue<SessionBase*>;
 
 struct InputMessage {
     std::vector<char> header;
@@ -39,7 +39,7 @@ class InputMessagesQueue {
 public:
     InputMessagePtr pop();
     void push(InputMessagePtr& imsg);
-    size_t empty() const;
+    bool empty() const;
 
 private:
     using Queue = std::queue<InputMessagePtr>; // TODO: make it lock-less list
@@ -49,7 +49,7 @@ private:
     Queue _queue;
 };
 
-enum class ItemState {
+enum class SessionState {
     Released,
     InProcessing,
 };
@@ -72,8 +72,8 @@ class SessionBase {
 public:
     virtual ~SessionBase() = default;
 
-    ItemState state() const { return _state; }
-    virtual void setState(ItemState state) { _state = state; }
+    SessionState state() const { return _state; }
+    virtual void setState(SessionState state) { _state = state; }
 
     virtual int init() { return 0; }
 
@@ -86,11 +86,11 @@ public:
     void completedWriting(size_t size) { _writeBuf.used(size); }
     void appendForWriting(DataBuffer& buffer) { _writeBuf.append(buffer); }
 
-    virtual int onRead(ItemsQueue*) { return 0; }
+    virtual int onRead(SessionsQueue* session);
     virtual int onWrite() { return 0; }
 
-    virtual std::optional<RequestBase*> getRequest() { return nullptr; }
-    virtual bool hasRequest() const { return false; }
+    virtual std::optional<RequestBase*> getRequest();
+    virtual bool hasRequest() const { return _inputQueue.empty(); }
     virtual ProcessingStatus sendResponse(const ResponseBase& /*response*/) { return ProcessingStatus::Failed; }
     virtual bool failed() const { return true; }
 
@@ -98,31 +98,22 @@ public:
     void setPipe(int fd) { _pipeFd = fd; }
 
 protected:
-    ItemState _state = ItemState::Released;
+    SessionState _state = SessionState::Released;
     DataBuffer _readBuf{1024};
     DataBuffer _writeBuf{1024 * 16};
-
-protected: // PROTOCOL SUPPORT
-    // We support only fixed-size header protocol. Live with this.
-    // Set this value in the derived class. 
-    // Use it in process() to get an input message fixed-size header.
-    size_t _headerSize = 0;
-
-    // Sanity check. Message body size cannot exceed this value.
-    size_t _maxBodySize = 1024;
-
-    // Pass header data to this function and get the size of the data message
-    // that follows the fixed-size header on wire.
-    // Override it in the derived class!
-    // One more thing: this fixed-size header should be parsed at no cost.
-    virtual size_t parseMessageSize(Buffer header) { (void)header; return 0; }
-
-protected: // PROCESSING SUPPORT
     InputMessagesQueue _inputQueue;
 
+protected: // Support for the fixed-size header protocol
+    size_t _headerSize = 0;
+    size_t _maxBodySize = 1024;
+    virtual size_t parseMessageSize(Buffer header) { (void)header; return 0; }
+
+protected:
     // Process data in a read buffer, convert it to an input message if possible,
     // put this input message into the queue.
+    // Base implementation supports fixed-size header protocol.
     virtual void processReadBufferData();
+    virtual std::optional<RequestBase*> parseMessage(const InputMessagePtr&) { return {}; }
 
 private:
     int _pipeFd = -1;

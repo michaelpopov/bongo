@@ -64,7 +64,7 @@ NonBlockNet::~NonBlockNet() {
     }
 
     for (auto& nb: _sessions) {
-        clearItem(nb);
+        clearSession(nb);
     }
     _sessions.clear();
 }
@@ -97,7 +97,7 @@ int NonBlockNet::init(size_t slotsCount) {
     return 0;
 }
 
-void NonBlockNet::deleteItem(NonBlockBase* nb) {
+void NonBlockNet::deleteSession(NonBlockBase* nb) {
     assert(_sessions.find(nb) != _sessions.end());
     assert(_stats.count() == sessionsCount());
 
@@ -105,7 +105,7 @@ void NonBlockNet::deleteItem(NonBlockBase* nb) {
         NonBlockConnection* conn = static_cast<NonBlockConnection*>(nb);
         NetSession* session = conn->session();
         switch (session->state()) {
-            case ItemState::Released:
+            case SessionState::Released:
                 break; // keep going, let's remove this connection.
             default:
                 nb->die();
@@ -114,10 +114,10 @@ void NonBlockNet::deleteItem(NonBlockBase* nb) {
     }
 
     _sessions.erase(nb);
-    clearItem(nb);
+    clearSession(nb);
 }
 
-void NonBlockNet::clearItem(NonBlockBase* nb) {
+void NonBlockNet::clearSession(NonBlockBase* nb) {
     if (nb == nullptr) {
         return;
     }
@@ -132,7 +132,7 @@ void NonBlockNet::clearItem(NonBlockBase* nb) {
     delete nb;
 }
 
-void NonBlockNet::addItem(NonBlockBase* nb) {
+void NonBlockNet::addSession(NonBlockBase* nb) {
     assert(nb !=  nullptr);
 
     switch (nb->type()) {
@@ -176,7 +176,7 @@ int NonBlockNet::registerFd(int fd, NetOpType opType, NonBlockBase* nb) {
         return -1;
     }
 
-    addItem(nb);
+    addSession(nb);
     return 0;
 }
 
@@ -224,7 +224,7 @@ int NonBlockNet::startListen(const NetOperation& op) {
                 close(fd);
             }
 
-            clearItem(nb);
+            clearSession(nb);
         }
     });
 
@@ -288,7 +288,7 @@ int NonBlockNet::startConnect(const NetOperation& op) {
                 close(fd);
             }
 
-            clearItem(nb);
+            clearSession(nb);
         }
     });
 
@@ -347,7 +347,7 @@ void NonBlockNet::on_accept(NonBlockListener* listener) {
 
         if (fd == -1) {
             LOG_ERROR << "NonBlockNet::on_accept: failed to accept connection: " << strerror(errno);
-            deleteItem(listener);
+            deleteSession(listener);
             return;
         }
 
@@ -363,7 +363,7 @@ void NonBlockNet::on_accept(NonBlockListener* listener) {
         ret = registerFd(fd, NetOpType::Read, nb);
         if (ret != 0) {
             LOG_ERROR << "NonBlockNet::on_accept: failed to register connection";
-            clearItem(nb);
+            clearSession(nb);
             return;
         }
 
@@ -386,7 +386,7 @@ void NonBlockNet::on_connect(NonBlockConnector* connector) {
                 connector->releaseFd();
             }
 
-            deleteItem(connector);
+            deleteSession(connector);
             connector = nullptr;
         }
     };
@@ -397,20 +397,20 @@ void NonBlockNet::on_connect(NonBlockConnector* connector) {
     int ret = nb->setSession(connector->factory());
     if (ret != 0) {
         LOG_ERROR << "NonBlockNet::on_accept: failed to set session for connection " << connector->name();
-        clearItem(nb);
+        clearSession(nb);
         return;
     }
 
     ret = modifyFd(nb->fd(), NetOpType::Write, nb);
     if (ret != 0) {
         LOG_ERROR << "NonBlockNet::on_connect: failed to modify fd";
-        clearItem(nb);
+        clearSession(nb);
         return;
     }
 
     result = true;
     cleanup();
-    addItem(nb);
+    addSession(nb);
     onWrite(nb);
 }
 
@@ -427,7 +427,7 @@ int NonBlockNet::on_connect(int fd, const NetOperation& op) {
     ret = registerFd(nb->fd(), NetOpType::Write, nb);
     if (ret != 0) {
         LOG_ERROR << "NonBlockNet::on_connect: failed to register fd";
-        clearItem(nb);
+        clearSession(nb);
         return -1;
     }
 
@@ -455,7 +455,7 @@ void NonBlockNet::onRead(NonBlockConnection* connection) {
         // Failed connection. Remove the connection.
         if (ret < 0 && (errno != EWOULDBLOCK && errno != EAGAIN)) {
             LOG_TRACE << "NonBlockNet::onRead: failed to read from socket";
-            deleteItem(connection);
+            deleteSession(connection);
             return;
         }
 
@@ -483,7 +483,7 @@ void NonBlockNet::onRead(NonBlockConnection* connection) {
     int ret = session->onRead(_queue);
     if (ret != 0) {
         LOG_TRACE << "NonBlockNet::onRead: finish connection: " << connection->name();
-        deleteItem(connection);
+        deleteSession(connection);
     }
 }
 
@@ -509,7 +509,7 @@ void NonBlockNet::onWrite(NonBlockConnection* connection) {
         // Failed connection. Remove the connection.
         if (ret < 0 && (errno != EWOULDBLOCK && errno != EAGAIN)) {
             LOG_TRACE << "NonBlockNet::onWrite: failed to write to socket";
-            deleteItem(connection);
+            deleteSession(connection);
             return;
         }
 
@@ -519,7 +519,7 @@ void NonBlockNet::onWrite(NonBlockConnection* connection) {
             ret = modifyFd(connection->fd(), NetOpType::Write, connection);
             if (ret != 0) {
                 LOG_TRACE << "NonBlockNet::onWrite: failed to modify to write: " << connection->name();
-                deleteItem(connection);
+                deleteSession(connection);
             }
 
             return;
@@ -544,7 +544,7 @@ void NonBlockNet::onWrite(NonBlockConnection* connection) {
     int ret = session->onWrite();
     if (ret < 0) {
         LOG_TRACE << "NonBlockNet::onWrite: finish connection: " << connection->name();
-        deleteItem(connection);
+        deleteSession(connection);
         return;
     }
 
@@ -555,7 +555,7 @@ void NonBlockNet::onWrite(NonBlockConnection* connection) {
         int ret = modifyFd(connection->fd(), NetOpType::Read, connection);
         if (ret != 0) {
             LOG_TRACE << "NonBlockNet::onWrite: failed to modify to write: " << connection->name();
-            deleteItem(connection);
+            deleteSession(connection);
             return;
         }
     }
@@ -574,7 +574,7 @@ void NonBlockNet::on_error(NonBlockBase* nb) {
         LOG_TRACE << "NonBlockNet::on_error: socket error: " << strerror(error);
     }
 
-    deleteItem(nb);
+    deleteSession(nb);
 }
 
 int  NonBlockNet::run(int time_ms) {
@@ -707,20 +707,20 @@ void NonBlockNet::processPipe() {
 
         NonBlockConnection* conn = session->connection();
         if (conn->dead()) {
-            deleteItem(conn);
+            deleteSession(conn);
             continue;
         }
 
         switch (msg->type()) {
-            case MessageType::ItemReleased:
+            case MessageType::SessionReleased:
                 LOG_TRACE << "NonBlockNet::processPipe: session released";
-                session->setState(ItemState::Released);
+                session->setState(SessionState::Released);
                 session->onRead(_queue);
                 break;
             
             case MessageType::MoreData: {
                 LOG_TRACE << "NonBlockNet::processPipe: more data";
-                session->setState(ItemState::Released);
+                session->setState(SessionState::Released);
                 onWrite(conn);
                 break;
             }

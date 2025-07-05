@@ -98,14 +98,11 @@ public:
         _maxBodySize = 128;
     }
 
-    int onRead(SessionsQueue*) override;
-
-    std::optional<RequestBase*> getRequest() override;
     ProcessingStatus sendResponse(const ResponseBase& resp) override;
 
 protected:
-    virtual size_t parseMessageSize(Buffer header) override;
-
+    size_t parseMessageSize(Buffer header) override;
+    std::optional<RequestBase*> parseMessage(const InputMessagePtr& msg) override;
 };
     
 class ReqRespSessionFactory : public NetSessionFactory {

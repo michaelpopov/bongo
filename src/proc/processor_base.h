@@ -27,7 +27,7 @@ struct ProcessorStats {
 
 class ProcessorBase {
 public:
-    ProcessorBase(ItemsQueue* sessionsQueue, ProcessorStats* stats = nullptr)
+    ProcessorBase(SessionsQueue* sessionsQueue, ProcessorStats* stats = nullptr)
       : _sessionsQueue(sessionsQueue), _stats(stats) {}
 
     void run();
@@ -38,7 +38,7 @@ protected:
     }
 
 private:
-    ItemsQueue* _sessionsQueue;
+    SessionsQueue* _sessionsQueue;
     ProcessorStats* _stats;
 
 private:

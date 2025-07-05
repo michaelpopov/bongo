@@ -20,6 +20,7 @@
 #include "utils/log.h"
 #include <assert.h>
 #include <string.h>
+#include <experimental/scope>
 
 namespace bongo {
 
@@ -42,7 +43,7 @@ void InputMessagesQueue::push(InputMessagePtr& imsg) {
     _queue.push(imsg);
 }
 
-size_t InputMessagesQueue::empty() const {
+bool InputMessagesQueue::empty() const {
     const std::unique_lock<std::mutex> lock(_mutex);
     return _queue.empty();
 }
@@ -82,6 +83,38 @@ void SessionBase::processReadBufferData() {
         // After getting a whole request release space in the buffer
         _readBuf.used(sizeof(uint32_t) + size);
     }
+}
+
+std::optional<RequestBase*> SessionBase::getRequest() {
+    InputMessagePtr msg = _inputQueue.pop();
+    if (msg == nullptr) {
+        return {};
+    }
+
+    auto cleanup = std::experimental::scope_exit([&]() {
+        if (msg != nullptr) {
+            delete msg;
+        }
+    });
+
+    return parseMessage(msg);
+}
+
+int SessionBase::onRead(SessionsQueue* queue) {
+    processReadBufferData();
+
+    // If the session is already in processing state, let processor to handle it.
+    if (_state != SessionState::Released) {
+        return 0;
+    }
+
+    // If the session is in the Released state, let's pass it to processing.
+    if (!_inputQueue.empty()) {
+        _state = SessionState::InProcessing;
+        queue->push(this);
+    }
+
+    return 0;
 }
 
 } // namespace bongo

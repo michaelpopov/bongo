@@ -23,7 +23,7 @@ namespace bongo {
 class SessionBase;
 
 enum class MessageType {
-    ItemReleased,
+    SessionReleased,
     MoreData,
     PushData,
 };

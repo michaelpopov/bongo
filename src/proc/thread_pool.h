@@ -16,19 +16,28 @@
    limitations under the License.
  **********************************************/
 #pragma once
+#include "session_base.h"
+#include "processor_base.h"
+#include <thread>
+#include <vector>
 
 namespace bongo {
 
-template <typename ProcessorType>
+template <typename ProcessorType, size_t Size = 0>
 class ThreadPool {
 public:
-    ThreadPool(size_t size) : _size(size) {}
+    ThreadPool(size_t size = Size) : _size(size) {
+        if (_size == 0) {
+            _size = std::thread::hardware_concurrency();
+        }
+    }
+
     ~ThreadPool() {
         stop();
     }
 
     void start() {
-        auto processorFunc = [](ItemsQueue* sessionsQueue, ProcessorStats* stats) {
+        auto processorFunc = [](SessionsQueue* sessionsQueue, ProcessorStats* stats) {
             ProcessorType processor(sessionsQueue, stats);
             processor.run();
         };
@@ -46,13 +55,13 @@ public:
         _threads.clear();
     }
 
-    ItemsQueue* sessionsQueue() { return &_sessionsQueue; }
+    SessionsQueue* sessionsQueue() { return &_sessionsQueue; }
     const ProcessorStats& stats() const { return _stats; }
 
 private:
     size_t _size;
     std::vector<std::thread> _threads;
-    ItemsQueue _sessionsQueue;
+    SessionsQueue _sessionsQueue;
     ProcessorStats _stats;
 };
 
