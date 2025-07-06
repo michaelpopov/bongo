@@ -103,7 +103,8 @@ protected:
 protected: // Support for the fixed-size header protocol
     size_t _headerSize = 0;
     size_t _maxBodySize = 1024;
-    virtual size_t parseMessageSize(Buffer header) { (void)header; return 0; }
+    std::string _headerDelimiter;
+    size_t _maxHeaderSize = 1024;
 
 protected:
     // Process data in a read buffer, convert it to an input message if possible,
@@ -111,6 +112,9 @@ protected:
     // Base implementation supports fixed-size header protocol.
     virtual void processReadBufferData();
     virtual std::optional<RequestBase*> parseMessage(const InputMessagePtr&) { return {}; }
+    virtual size_t parseMessageSize(Buffer header) { (void)header; return 0; }
+    virtual void processReadBufferDataFixedHeader();
+    virtual void processReadBufferDataVariableHeader();
 
 private:
     int _pipeFd = -1;

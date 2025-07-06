@@ -19,19 +19,33 @@
 #include "utils/log.h"
 #include <assert.h>
 #include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <experimental/scope>
 
 namespace bongo {
+
+const std::string MirrorSession::HeaderDelimiter = "\r\n";
 
 /***********************************************************
  *   Session
  */
 MirrorSession::MirrorSession() {
-    _headerSize = 4;
+    _headerSize = 4;  // By default it supports a fixed-size header protocol
+}
+
+void MirrorSession::setHeaderDelimiter() {
+    _headerSize = 0;
+    _headerDelimiter = HeaderDelimiter;
 }
 
 ProcessingStatus MirrorSession::sendResponse(const ResponseBase& response) {
     const MirrorResponse& resp = dynamic_cast<const MirrorResponse&>(response);
+    return _headerSize > 0 ? sendResponseFixedHeader(resp) :
+                             sendResponseVariableHeader(resp);
+}
 
+ProcessingStatus MirrorSession::sendResponseFixedHeader(const MirrorResponse& resp) {
     uint32_t len = resp.output.length();
     size_t serializedSize = sizeof(len) + resp.output.length();
     Buffer dest = _writeBuf.getAvailable(serializedSize);
@@ -43,17 +57,80 @@ ProcessingStatus MirrorSession::sendResponse(const ResponseBase& response) {
     return ProcessingStatus::Ok;
 }
 
-size_t MirrorSession::parseMessageSize(Buffer header) { 
+ProcessingStatus MirrorSession::sendResponseVariableHeader(const MirrorResponse& resp) {
+    const std::string output = makeInputMirrorVarHeader(resp.output);
+    Buffer dest = _writeBuf.getAvailable(output.length());
+    memcpy(dest.ptr, output.data(), output.length());
+    _writeBuf.update(output.length());
+    return ProcessingStatus::Ok;
+}
+
+size_t MirrorSession::parseMessageSize(Buffer header) {
+    size_t _ = 0;
+    return _headerSize > 0 ? parseMessageSizeFixedHeader(header) :
+                             parseMessageSizeVariableHeader(header, _);
+}
+
+size_t MirrorSession::parseMessageSizeFixedHeader(Buffer header) {
     uint32_t size = -1;
     assert(header.size >= sizeof(size));
     memcpy(&size, header.ptr, sizeof(size));
     return size;
 }
 
+size_t MirrorSession::parseMessageSizeVariableHeader(Buffer header, size_t& headerSize) {
+    headerSize = 0;
+
+    // N\r\n
+    const std::string_view haystack(header.ptr, header.size);
+    size_t endOfValuePos = haystack.find(HeaderDelimiter);
+    if (endOfValuePos == std::string_view::npos) {
+        // TODO: Invalid protocol. Kill session.
+        return 0;
+    }
+
+    header.ptr[endOfValuePos] = '\0';
+    auto restoreHeader = std::experimental::scope_exit([&]() {
+        header.ptr[endOfValuePos] = '\r';
+    });
+
+    char* endptr = nullptr;
+    const char* str = header.ptr;
+    long val = strtol(str, &endptr, 10);
+    if (endptr == str || *endptr != '\0' || val < 0) {
+        // TODO: Invalid protocol. Kill session.
+        return 0;
+    }
+
+    headerSize = endptr - header.ptr + HeaderDelimiter.length();
+    return val;
+}
+
 std::optional<RequestBase*> MirrorSession::parseMessage(const InputMessagePtr& msg) {
     MirrorRequest* req = new MirrorRequest;
     req->input.assign(msg->body.data(), msg->body.size());
     return req;
+}
+
+std::string MirrorSession::makeInputMirrorVarHeader(const std::string& str) {
+    const uint32_t len = str.length();
+    char buffer[64];
+    snprintf(buffer, sizeof(buffer)-1, "%u", len);
+
+    std::string result = buffer;
+    result += HeaderDelimiter;
+    result += str;
+
+    return result;
+}
+
+std::string MirrorSession::parseOutput(Buffer buf, size_t& size) {
+    size_t headerSize = 0;
+    size_t bodySize = parseMessageSizeVariableHeader(buf, headerSize);
+    size = headerSize + bodySize;
+    assert(headerSize + bodySize <= buf.size);
+    std::string result(buf.ptr + headerSize, bodySize);
+    return result;
 }
 
 /***********************************************************

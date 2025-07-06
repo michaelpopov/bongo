@@ -18,6 +18,7 @@
 #include "session_base.h"
 #include "processor_base.h"
 #include "thread_pool.h"
+#include <string_view>
 
 namespace bongo {
 
@@ -39,9 +40,21 @@ class MirrorSession : public SessionBase {
 public:
     MirrorSession();
     ProcessingStatus sendResponse(const ResponseBase& response) override;
+    void setHeaderDelimiter();
+
+    static std::string makeInputMirrorVarHeader(const std::string& str);
+    static std::string parseOutput(Buffer buf, size_t& size);
+
 protected:
     size_t parseMessageSize(Buffer header) override;
     std::optional<RequestBase*> parseMessage(const InputMessagePtr& msg) override;
+private:
+    static const std::string HeaderDelimiter;
+private:
+    size_t parseMessageSizeFixedHeader(Buffer header);
+    static size_t parseMessageSizeVariableHeader(Buffer header, size_t& size);
+    ProcessingStatus sendResponseFixedHeader(const MirrorResponse& resp);
+    ProcessingStatus sendResponseVariableHeader(const MirrorResponse& resp);
 };
 
 /***************************

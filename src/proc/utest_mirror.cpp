@@ -145,3 +145,55 @@ TEST(SESSION, MirrorMultiRequest) {
 
     session->completedWriting(writeBuffer.size);
 }
+
+TEST(SESSION, MirrorVarHeaderSize) {
+    TempLogLevel tll{"DEBUG"};
+
+    PipeQueue pipeQueue;
+    auto pipeQueueRet = pipeQueue.init();
+    ASSERT_EQ(0, pipeQueueRet.first);
+
+    MirrorSingleThreadPool pool;
+    pool.start();
+    SessionsQueue* sessionsQueue = pool.sessionsQueue();
+
+    MirrorSession* session = new MirrorSession;
+    auto cleanupSession = std::experimental::scope_exit([&]() { delete session; });
+    session->setHeaderDelimiter();
+    session->setPipe(pipeQueue.writeFd());
+    ASSERT_EQ(SessionState::Released, session->state());
+
+    std::vector<std::string> inputs = {
+        "Hello, world!",
+        "",
+    };
+
+    for (const auto& inputStr: inputs) {
+        MessageBase* msg = nullptr;
+        auto cleanupMsg = std::experimental::scope_exit([&]() { delete msg; });
+
+        const std::string requestStr = MirrorSession::makeInputMirrorVarHeader(inputStr);
+        Buffer readBuffer = session->getReadBuffer(requestStr.length());
+        memcpy(readBuffer.ptr, requestStr.data(), requestStr.length());
+        session->updateReadBuffer(requestStr.length());
+
+        session->onRead(sessionsQueue);
+        ASSERT_EQ(SessionState::InProcessing, session->state());
+
+        void* ptr = nullptr;
+        pipeQueue.read(ptr);
+        msg = static_cast<MessageBase*>(ptr);
+        ASSERT_NE(nullptr, msg);
+        ASSERT_EQ(MessageType::SessionReleased, msg->type());
+        ASSERT_EQ(session, msg->session());
+
+        session->setState(SessionState::Released);
+
+        Buffer writeBuffer = session->getDataForWriting();
+        size_t outputSize = 0;
+        std::string outputStr = MirrorSession::parseOutput(writeBuffer, outputSize);
+        ASSERT_EQ(inputStr, outputStr);
+        ASSERT_EQ(writeBuffer.size, outputSize);
+        session->completedWriting(writeBuffer.size);
+    }
+}

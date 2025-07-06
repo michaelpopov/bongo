@@ -21,6 +21,7 @@
 #include <assert.h>
 #include <string.h>
 #include <experimental/scope>
+#include <string_view>
 
 namespace bongo {
 
@@ -52,6 +53,14 @@ bool InputMessagesQueue::empty() const {
  *   SessionBase
  */
 void SessionBase::processReadBufferData() {
+    if (_headerSize > 0) {
+        processReadBufferDataFixedHeader();
+    } else {
+        processReadBufferDataVariableHeader();
+    }
+}
+
+void SessionBase::processReadBufferDataFixedHeader() {
     for (;;) {
         // Get size of the request
         Buffer src = _readBuf.getData();
@@ -79,7 +88,46 @@ void SessionBase::processReadBufferData() {
         _inputQueue.push(msg);
 
         // After getting a whole request release space in the buffer
-        _readBuf.used(sizeof(uint32_t) + size);
+        _readBuf.used(_headerSize + size);        
+    }
+}
+
+void SessionBase::processReadBufferDataVariableHeader() {
+    for (;;) {
+        // Get size of the request
+        Buffer src = _readBuf.getData();
+        std::string_view haystack(src.ptr, src.size);
+        const size_t pos = haystack.find(_headerDelimiter);
+        if (pos == std::string_view::npos) {
+            if (src.size > _maxHeaderSize) {
+                // TODO: Bad input. Kill session.
+            }
+
+            break;
+        }
+
+        // Light parsing to get body size from the message header.
+        uint32_t size = parseMessageSize(src);
+        if (size > _maxBodySize) {
+            // TODO: KILL SESSION
+            return;
+        }
+
+        // Check is there a whole request body in the buffer
+        size_t bodyStartPos = pos + _headerDelimiter.length();
+        if (src.size < size + bodyStartPos) {
+            break;
+        }
+
+        InputMessagePtr msg = new InputMessage;
+        msg->header.resize(bodyStartPos);
+        memcpy(msg->header.data(), src.ptr, bodyStartPos);
+        msg->body.resize(size);
+        memcpy(msg->body.data(), src.ptr + bodyStartPos, size);
+        _inputQueue.push(msg);
+
+        // After getting a whole request release space in the buffer
+        _readBuf.used(bodyStartPos + size);        
     }
 }
 
