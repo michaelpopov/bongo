@@ -19,8 +19,6 @@
 #include "config.h"
 #include "gtest/gtest.h"
 
-using namespace passio::a1::client;
-
 TEST(CLIENT_CONFIG, Ctor) {
     Config config;
     ASSERT_EQ(-1, config.port());

@@ -7,7 +7,7 @@ SOURCES := config.cpp pipe_queue.cpp data_buffer.cpp
 OBJS := $(subst .cpp,.o,$(SOURCES))
 
 UTEST_MAIN=$(PROJECT_HOME)/src/utils/utest_main.cpp
-TEST_SOURCES := utest_config.cpp utest_data_buffer.cpp
+TEST_SOURCES := utest_config.cpp utest_data_buffer.cpp utest_pipe_queue.cpp
 TEST_OBJS := $(subst .cpp,.o,$(TEST_SOURCES))
 
 LIBS :=  -lgtest -lpthread

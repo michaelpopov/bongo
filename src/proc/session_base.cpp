@@ -16,7 +16,7 @@
    limitations under the License.
  **********************************************/
 #include "session_base.h"
-#include "message.h"
+#include "notification_base.h"
 #include "utils/log.h"
 #include <assert.h>
 #include <string.h>

@@ -21,8 +21,6 @@
 #include <iostream>
 #include <getopt.h>
 
-namespace passio::a1::client {
-
 static struct option opts[] = {
     { "host",  1, 0, 'h' },
     { "port",  1, 0, 'p' },
@@ -105,6 +103,3 @@ int Config::setLogLevel(const char* arg) {
 
     return 0;
 }
-
-} // namespace passio::a1::client
-    

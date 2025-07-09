@@ -20,8 +20,6 @@
 #include "log.h"
 #include "gtest/gtest.h"
 
-using namespace bongo;
-
 TEST(DATA_BUFFER, Basics) {
     const size_t count = 4096;
     const size_t step = 16;

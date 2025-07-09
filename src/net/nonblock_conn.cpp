@@ -17,7 +17,7 @@
  **********************************************/
 
 #include "nonblock_conn.h"
-#include "proc/message.h"
+#include "proc/notification_base.h"
 #include "utils/log.h"
 
 #include <experimental/scope>
@@ -78,13 +78,13 @@ int NonBlockNet::init(size_t slotsCount) {
         return -1;
     }
 
-    auto [ret, err] = _pipe.init();
+    auto [ret, err] = _notificationQueue.init();
     if (ret != 0) {
         return -1;
     }
 
-    NonBlockBase* nb = new NonBlockBase("PipeQueue", _pipe.readFd(), NonBlockFdType::PipeQueue);
-    ret = registerFd(_pipe.readFd(), NetOpType::Read, nb);
+    NonBlockBase* nb = new NonBlockBase("PipeQueue", _notificationQueue.getReadFd(), NonBlockFdType::PipeQueue);
+    ret = registerFd(_notificationQueue.getReadFd(), NetOpType::Read, nb);
     if (ret != 0) {
         LOG_ERROR << "onBlockNet::init: failed register pipe fd";
         delete nb;
@@ -369,7 +369,7 @@ void NonBlockNet::on_accept(NonBlockListener* listener) {
 
         // Pass a write side of the pipe to the session, so processors will be able
         // to send messages back to this instance.
-        nb->session()->setPipe(_pipe.writeFd());
+        nb->session()->setPipe(_notificationQueue.getWriteFd());
 
         LOG_TRACE << "NonBlockNet::on_accept: accepted new connection for " << nb->name();
         onRead(nb);
@@ -678,29 +678,11 @@ int  NonBlockNet::step(int time_ms) {
 
 void NonBlockNet::processPipe() {
     for (;;) {
-        void* ptr = nullptr;
-        auto [ret, err] = _pipe.read(ptr); // TODO: make it buffered read in the pipe.
-        if (ret != 0) {
-            if (err == EINTR) {
-                continue;
-            }
-
-            if (err == EWOULDBLOCK || err == EAGAIN) {
-                break;
-            }
-
-            // TODO: make it FATAL.
-            LOG_CRITICAL << "NonBlockNet::processPipe: failed to get ptr from pipe: " << strerror(err);
-            return;
+        NotificationBase* msg = _notificationQueue.next();
+        auto cleanup = std::experimental::scope_exit([&]() { delete msg; });
+        if (msg == nullptr) {
+            break;
         }
-
-        MessageBase* msg = static_cast<MessageBase*>(ptr);
-        assert(msg != nullptr);
-        auto cleanup = std::experimental::scope_exit([&]() {
-            if (msg != nullptr) {
-                delete msg;
-            }
-        });
 
         NetSession* session = static_cast<NetSession*>(msg->session());
         assert(session);
@@ -712,13 +694,13 @@ void NonBlockNet::processPipe() {
         }
 
         switch (msg->type()) {
-            case MessageType::SessionReleased:
+            case NotificationType::SessionReleased:
                 LOG_TRACE << "NonBlockNet::processPipe: session released";
                 session->setState(SessionState::Released);
                 session->onRead(_queue);
                 break;
             
-            case MessageType::MoreData: {
+            case NotificationType::MoreData: {
                 LOG_TRACE << "NonBlockNet::processPipe: more data";
                 session->setState(SessionState::Released);
                 onWrite(conn);

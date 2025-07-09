@@ -16,7 +16,7 @@
    limitations under the License.
  **********************************************/
 #include "processor_base.h"
-#include "message.h"
+#include "notification_base.h"
 #include "utils/log.h"
 #include "utils/pipe_queue.h"
 #include <experimental/scope>
@@ -41,7 +41,7 @@ void ProcessorBase::run() {
 }
 
 void ProcessorBase::processSession(SessionBase* session) {
-    MessageType resultType = MessageType::SessionReleased;
+    NotificationType resultType = NotificationType::SessionReleased;
     ProcessingStatus status = ProcessingStatus::Failed;
 
     while (auto optionalRequest = session->getRequest()) {
@@ -66,8 +66,8 @@ void ProcessorBase::processSession(SessionBase* session) {
 
     if (session->failed() || !session->hasRequest() || status != ProcessingStatus::Ok) {
         // Notify the network thread that session is released.
-        MessageBase* msg = new MessageBase(resultType, session);
-        PipeQueue::write(session->getPipe(), &msg);
+        NotificationBase* msg = new NotificationBase(resultType, session);
+        writePipeFd(session->getPipe(), &msg);
     } else {
         // Return the session to the queue for further processing.
         _sessionsQueue->push(session);

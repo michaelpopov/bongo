@@ -21,12 +21,6 @@
 #include <string.h>
 #include <iostream>
 
-namespace bongo {
-
-/*******************************************************************************
- *   DataBuffer
- */
-
 Buffer DataBuffer::getData() {
     return Buffer {
         .ptr = _data.data() + _offset,
@@ -87,6 +81,3 @@ void DataBuffer::testPrint() const {
         << "\tptr=" << (void*)_data.data()
         << std::endl;
 }
-
-
-} // namespace bongo

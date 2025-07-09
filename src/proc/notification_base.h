@@ -1,5 +1,5 @@
 /**********************************************
-   File:   message.h
+   File:   notification_base.h
 
    Copyright 2025 Michael Popov
 
@@ -17,36 +17,37 @@
  **********************************************/
 
 #pragma once
+#include "utils/pipe_queue.h"
 
 namespace bongo {
 
 class SessionBase;
 
-enum class MessageType {
+enum class NotificationType {
     SessionReleased,
     MoreData,
     PushData,
 };
 
-class MessageBase {
+class NotificationBase {
 public:
-    MessageBase(MessageType type, SessionBase* session) : _type(type), _session(session) {}
-    virtual ~MessageBase() = default;
+    NotificationBase(NotificationType type, SessionBase* session) : _type(type), _session(session) {}
+    virtual ~NotificationBase() = default;
 
-    MessageType type() const { return _type; }
+    NotificationType type() const { return _type; }
     SessionBase* session() const { return _session; }
 
 private:
-    MessageType _type;
+    NotificationType _type;
     SessionBase* _session;
 };
 
 /*******************************************************************************
  * DON'T BOTHER WITH THIS YET!!!
-class MessagePushData : public MessageBase {
+class MessagePushData : public NotificationBase {
 public:
     MessagePushData(SessionBase* session, DataBuffer& buffer)
-      : MessageBase(MessageType::PushData, session) {
+      : NotificationBase(NotificationType::PushData, session) {
         _buffer.swap(buffer);
     }
 
@@ -56,5 +57,7 @@ private:
     DataBuffer _buffer;
 };
  *********************************************************************************/
+
+using NotificationQueue = PipeQueue<NotificationBase>;
 
 } // namespace bongo

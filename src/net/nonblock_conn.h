@@ -18,7 +18,7 @@
 
 #pragma once
 #include "net_session.h"
-#include "utils/pipe_queue.h"
+#include "proc/notification_base.h"
 #include "utils/thread_queue.h"
 #include <string>
 #include <vector>
@@ -115,7 +115,7 @@ public:
     void stop();
     int  step(int time_ms);
 
-    int pipeFd() const { return _pipe.writeFd(); }
+    int pipeFd() const { return _notificationQueue.getWriteFd(); }
 
     void waitListenerReady(size_t listenersCount = 1, size_t loopCount = 10, int sleepLenMs = 50);
 
@@ -136,7 +136,7 @@ public:
     size_t sessionsCount() const { return _sessions.size(); }
 
     void setSessionsQueue(SessionsQueue* queue) { _queue = queue; }
-    PipeQueue* getPipeQueue() { return &_pipe; }
+    NotificationQueue* getNotificationQueue() { return &_notificationQueue; }
 
 private:
     int _fd = -1;
@@ -144,7 +144,7 @@ private:
     std::unordered_set<NonBlockBase*> _sessions;
     Stats _stats;
     std::atomic<bool> _keepRunning = false;
-    PipeQueue _pipe;
+    NotificationQueue _notificationQueue;
     SessionsQueue* _queue = nullptr;
 
 private:

@@ -17,6 +17,8 @@
  **********************************************/
 #include "session_base.h"
 #include "processor_base.h"
+#include "notification_base.h"
+#include "utils/pipe_queue.h"
 #include "thread_pool.h"
 #include <string_view>
 

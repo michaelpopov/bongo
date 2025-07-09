@@ -19,8 +19,6 @@
 #pragma once
 #include <vector>
 
-namespace bongo {
-
 struct Buffer {
     char* ptr;
     size_t size;
@@ -45,5 +43,3 @@ private:
     size_t _size = 0;
     std::vector<char> _data;
 };
-
-} // namespace bongo

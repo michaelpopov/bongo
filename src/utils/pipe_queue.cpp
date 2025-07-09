@@ -18,39 +18,41 @@
 
 #include "pipe_queue.h"
 #include "log.h"
+#include <assert.h>
+#include <iostream>
 
-PipeQueue::~PipeQueue() {
-    for (int i = 0; i < 2; i++) {
-        if (pipefd[i] != -1) {
-            close(pipefd[i]);
+size_t readPipeData(int fd, void** buf, size_t bufSize) {
+    int ret = ::read(fd, buf, bufSize * sizeof(void*));
+    if (ret < 0) {
+        if (errno != EAGAIN && errno != EWOULDBLOCK) {
+            LOG_ERROR << "readPipeData: failed read(): " << strerror(errno);
         }
+        return 0;
     }
+
+    assert(ret % sizeof(void*) == 0);
+    return ret / sizeof(void*);
 }
 
-PipeQueue::PipeResult PipeQueue::init() {
-    int ret = pipe(pipefd);
+PipeResult initPipeFds(int* fds) {
+    int ret = pipe(fds);
     if (ret < 0) {
-        LOG_ERROR << "PipeQueue::init: failed pipe(): " << strerror(errno);
+        LOG_ERROR << "initPipeFds: failed pipe(): " << strerror(errno);
         return PipeResult{ ret, errno };
     }
 
     return PipeResult{ 0, 0 };
 }
 
-PipeQueue::PipeResult PipeQueue::read(void*& ptr) {
-    int ret = ::read(pipefd[0], &ptr, sizeof(ptr));
-    if (ret != sizeof(ptr)) {
-        return PipeResult{ -1, errno };
+void closePipeFds(int* fds) {
+    for (int i = 0; i < 2; i++) {
+        if (fds[i] != -1) {
+            close(fds[i]);
+        }
     }
-
-    return PipeResult{ 0, 0 };
 }
 
-PipeQueue::PipeResult PipeQueue::write(void* ptr) {
-    return write(pipefd[1], ptr);
-}
-
-PipeQueue::PipeResult PipeQueue::write(int fd, void* ptr) {
+PipeResult writePipeFd(int fd, void* ptr) {
     int ret = ::write(fd, ptr, sizeof(ptr));
     if (ret != sizeof(ptr)) {
         return PipeResult{ ret, errno };

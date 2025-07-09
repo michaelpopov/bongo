@@ -18,22 +18,52 @@
 
 #pragma once
 #include <utility>
+#include <vector>
 
+using PipeResult = std::pair<int, int>; // ret, errno
+
+size_t readPipeData(int fd, void** buf, size_t bufSize);
+PipeResult initPipeFds(int* fds);
+void closePipeFds(int* fds);
+PipeResult writePipeFd(int fd, void* ptr);
+
+template <typename T, size_t Size=128>
 class PipeQueue {
 public:
-    using PipeResult = std::pair<int, int>; // ret, errno
+    PipeQueue(size_t size = 0) {
+        if (size == 0) {
+            size = Size;
+        }
+        _data.resize(size);
+    }
 
-    ~PipeQueue();
+    ~PipeQueue() {
+        closePipeFds(_pipefd);
+    }
 
-    PipeResult init();
-    int readFd() const { return pipefd[0]; }
-    int writeFd() const { return pipefd[1]; }
+    PipeResult init() {
+        return initPipeFds(_pipefd);
+    }
 
-    PipeResult read(void*& ptr);
-    PipeResult write(void* ptr);
+    T* next() {
+        if (_pos == _count) {
+            _pos = 0;
+            _count = readPipeData(_pipefd[0], _data.data(), _data.size());
+        }
 
-    static PipeResult write(int fd, void* ptr);
+        if (_pos == _count) {
+            return nullptr;
+        }
+
+        return (T*)_data[_pos++];
+    }
+
+    int getReadFd() const { return _pipefd[0]; }
+    int getWriteFd() const { return _pipefd[1]; }
 
 private:
-    int pipefd[2] = { -1, -1 };
+    size_t _pos = 0;
+    size_t _count = 0;
+    std::vector<void*> _data;
+    int _pipefd[2] = { -1, -1 };
 };

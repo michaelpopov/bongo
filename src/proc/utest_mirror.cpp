@@ -16,7 +16,7 @@
    limitations under the License.
  **********************************************/
 #include "mirror_test.h"
-#include "message.h"
+#include "notification_base.h"
 #include "utils/pipe_queue.h"
 #include "utils/log.h"
 #include <experimental/scope>
@@ -31,7 +31,7 @@ TEST(SESSION, MirrorBasic) {
     MirrorSession* session = nullptr;
     auto cleanupSession = std::experimental::scope_exit([&]() { delete session; });
 
-    PipeQueue pipeQueue;
+    NotificationQueue pipeQueue;
     auto pipeQueueRet = pipeQueue.init();
     ASSERT_EQ(0, pipeQueueRet.first);
 
@@ -40,7 +40,7 @@ TEST(SESSION, MirrorBasic) {
     SessionsQueue* sessionsQueue = pool.sessionsQueue();
 
     session = new MirrorSession;
-    session->setPipe(pipeQueue.writeFd());
+    session->setPipe(pipeQueue.getWriteFd());
     ASSERT_EQ(SessionState::Released, session->state());
 
     std::vector<std::string> inputs = {
@@ -49,7 +49,7 @@ TEST(SESSION, MirrorBasic) {
     };
 
     for (const auto& inputStr: inputs) {
-        MessageBase* msg = nullptr;
+        NotificationBase* msg = nullptr;
         auto cleanupMsg = std::experimental::scope_exit([&]() { delete msg; });
 
         const uint32_t len = inputStr.length();
@@ -62,11 +62,9 @@ TEST(SESSION, MirrorBasic) {
         session->onRead(sessionsQueue);
         ASSERT_EQ(SessionState::InProcessing, session->state());
 
-        void* ptr = nullptr;
-        pipeQueue.read(ptr);
-        msg = static_cast<MessageBase*>(ptr);
+        msg = pipeQueue.next();
         ASSERT_NE(nullptr, msg);
-        ASSERT_EQ(MessageType::SessionReleased, msg->type());
+        ASSERT_EQ(NotificationType::SessionReleased, msg->type());
         ASSERT_EQ(session, msg->session());
 
         session->setState(SessionState::Released);
@@ -84,12 +82,12 @@ TEST(SESSION, MirrorBasic) {
 TEST(SESSION, MirrorMultiRequest) {
     TempLogLevel tll{"DEBUG"};
 
-    MessageBase* msg = nullptr;
+    NotificationBase* msg = nullptr;
     auto cleanupMsg = std::experimental::scope_exit([&]() { delete msg; });
     MirrorSession* session = nullptr;
     auto cleanupSession = std::experimental::scope_exit([&]() { delete session; });
 
-    PipeQueue pipeQueue;
+    NotificationQueue pipeQueue;
     auto pipeQueueRet = pipeQueue.init();
     ASSERT_EQ(0, pipeQueueRet.first);
 
@@ -98,7 +96,7 @@ TEST(SESSION, MirrorMultiRequest) {
     SessionsQueue* sessionsQueue = pool.sessionsQueue();
 
     session = new MirrorSession;
-    session->setPipe(pipeQueue.writeFd());
+    session->setPipe(pipeQueue.getWriteFd());
     ASSERT_EQ(SessionState::Released, session->state());
 
     std::vector<std::string> inputs = {
@@ -118,11 +116,9 @@ TEST(SESSION, MirrorMultiRequest) {
     session->onRead(sessionsQueue);
     ASSERT_EQ(SessionState::InProcessing, session->state());
 
-    void* ptr = nullptr;
-    pipeQueue.read(ptr);
-    msg = static_cast<MessageBase*>(ptr);
+    msg = pipeQueue.next();
     ASSERT_NE(nullptr, msg);
-    ASSERT_EQ(MessageType::SessionReleased, msg->type());
+    ASSERT_EQ(NotificationType::SessionReleased, msg->type());
     ASSERT_EQ(session, msg->session());
 
     session->setState(SessionState::Released);
@@ -149,7 +145,7 @@ TEST(SESSION, MirrorMultiRequest) {
 TEST(SESSION, MirrorVarHeaderSize) {
     TempLogLevel tll{"DEBUG"};
 
-    PipeQueue pipeQueue;
+    NotificationQueue pipeQueue;
     auto pipeQueueRet = pipeQueue.init();
     ASSERT_EQ(0, pipeQueueRet.first);
 
@@ -160,7 +156,7 @@ TEST(SESSION, MirrorVarHeaderSize) {
     MirrorSession* session = new MirrorSession;
     auto cleanupSession = std::experimental::scope_exit([&]() { delete session; });
     session->setHeaderDelimiter();
-    session->setPipe(pipeQueue.writeFd());
+    session->setPipe(pipeQueue.getWriteFd());
     ASSERT_EQ(SessionState::Released, session->state());
 
     std::vector<std::string> inputs = {
@@ -169,7 +165,7 @@ TEST(SESSION, MirrorVarHeaderSize) {
     };
 
     for (const auto& inputStr: inputs) {
-        MessageBase* msg = nullptr;
+        NotificationBase* msg = nullptr;
         auto cleanupMsg = std::experimental::scope_exit([&]() { delete msg; });
 
         const std::string requestStr = MirrorSession::makeInputMirrorVarHeader(inputStr);
@@ -180,11 +176,9 @@ TEST(SESSION, MirrorVarHeaderSize) {
         session->onRead(sessionsQueue);
         ASSERT_EQ(SessionState::InProcessing, session->state());
 
-        void* ptr = nullptr;
-        pipeQueue.read(ptr);
-        msg = static_cast<MessageBase*>(ptr);
+        msg = pipeQueue.next();
         ASSERT_NE(nullptr, msg);
-        ASSERT_EQ(MessageType::SessionReleased, msg->type());
+        ASSERT_EQ(NotificationType::SessionReleased, msg->type());
         ASSERT_EQ(session, msg->session());
 
         session->setState(SessionState::Released);

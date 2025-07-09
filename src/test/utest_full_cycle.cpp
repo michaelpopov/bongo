@@ -16,7 +16,7 @@
    limitations under the License.
  **********************************************/
 #include "proc/processor_base.h"
-#include "proc/message.h"
+#include "proc/notification_base.h"
 #include "proc/thread_pool.h"
 #include "session_demo.h"
 #include "net/block_conn.h"

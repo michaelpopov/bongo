@@ -20,8 +20,6 @@
 #include "log.h"
 #include <string>
 
-namespace passio::a1::client {
-
 class Config {
 public:
     int init(int argc, const char** argv);
@@ -44,5 +42,3 @@ private:
 private:
     int setLogLevel(const char* arg);
 };
-
-} // namespace passio::a1::client
