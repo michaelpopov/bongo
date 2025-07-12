@@ -21,19 +21,21 @@
 #include <iostream>
 #include <getopt.h>
 
+namespace bongo {
+
 static struct option opts[] = {
-    { "host",  1, 0, 'h' },
-    { "port",  1, 0, 'p' },
-    { "log",   1, 0, 'l' },
-    { "batch", 0, 0, 'b' },
-    { 0,       0, 0,  0 },
+    { "host",    1, 0, 'h' },
+    { "port",    1, 0, 'p' },
+    { "log",     1, 0, 'l' },
+    { "threads", 1, 0, 't' },
+    { 0,         0, 0,  0 },
 };
     
 static const char* config_str = "h:p:l:b";
 
 static const char* usage_str = "Usage:\n"
-"    client -p <port> -h <host>\n"
-"    client --port <port> --host <host>\n";
+"    http_perf -p <port> -h <host>\n"
+"    http_perf --port <port> --host <host> --log TRACE\n";
 
 int Config::init(int argc, const char** argv) {
     optind = 1;
@@ -46,14 +48,10 @@ int Config::init(int argc, const char** argv) {
         }
 
         switch (c) {
-            case 'b':
-                _interactive = false;
-                break;
-
             case 'h':
                 _host = optarg;
                 break;
-            
+
             case 'p': {
                 int n = sscanf(optarg, "%d", &_port);
                 if (n != 1) {
@@ -61,7 +59,15 @@ int Config::init(int argc, const char** argv) {
                 }
                 break;
             }
-            
+
+            case 't': {
+                int n = sscanf(optarg, "%d", &_threadsCount);
+                if (n != 1) {
+                    return -1;
+                }
+                break;
+            }
+
             case 'l':
                 if (0 != setLogLevel(optarg)) {
                     return -1;
@@ -103,3 +109,5 @@ int Config::setLogLevel(const char* arg) {
 
     return 0;
 }
+
+} // namespace bongo

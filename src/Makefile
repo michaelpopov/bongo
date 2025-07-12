@@ -24,6 +24,7 @@ release:
 	$(MAKE) -C proc release_bld
 	$(MAKE) -C net release_bld
 	$(MAKE) -C test release_bld
+	$(MAKE) -C perf release_bld
 
 .PHONY: debug
 debug:
@@ -31,6 +32,7 @@ debug:
 	$(MAKE) -C proc debug_bld
 	$(MAKE) -C net debug_bld
 	$(MAKE) -C test debug_bld
+	$(MAKE) -C perf debug_bld
 
 .PHONY: test
 test:
@@ -45,6 +47,7 @@ clean:
 	$(MAKE) -C proc clean
 	$(MAKE) -C net clean
 	$(MAKE) -C test clean
+	$(MAKE) -C perf clean
 	rm -f $(PROJECT_HOME)/bin/* $(PROJECT_HOME)/bin-dbg/* $(PROJECT_HOME)/lib/* $(PROJECT_HOME)/lib-dbg/*
 
 

@@ -3,14 +3,10 @@ all: debug_bld
 CXXFLAGS += -c -Wall -Wextra -Werror -std=c++20
 INCS := -I$(PROJECT_HOME)/src -I$(PROJECT_HOME)/include
 
-SOURCES := pipe_queue.cpp data_buffer.cpp
+SOURCES := perf_main.cpp config.cpp
 OBJS := $(subst .cpp,.o,$(SOURCES))
 
-UTEST_MAIN=$(PROJECT_HOME)/src/utils/utest_main.cpp
-TEST_SOURCES := utest_data_buffer.cpp utest_pipe_queue.cpp
-TEST_OBJS := $(subst .cpp,.o,$(TEST_SOURCES))
-
-LIBS :=  -lgtest -lpthread
+LIBS := -lpthread
 STATIC_LIBS := 
 
 export
@@ -26,6 +22,10 @@ debug_bld:
 .PHONY: test
 test:
 	$(MAKE) -C debug test
+
+.PHONY: run
+run:
+	$(MAKE) -C debug run
 
 PHONY: clean
 clean:

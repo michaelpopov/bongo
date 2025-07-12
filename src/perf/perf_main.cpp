@@ -1,5 +1,5 @@
 /**********************************************
-   File:   config.h
+   File:   perf_main.cpp
 
    Copyright 2025 Michael Popov
 
@@ -16,29 +16,11 @@
    limitations under the License.
  **********************************************/
 
-#pragma once
-#include "log.h"
-#include <string>
+#include <iostream>
 
-class Config {
-public:
-    int init(int argc, const char** argv);
-
-    int port() const { return _port; }
-    const char* host() const { return _host.c_str(); }
-    LogLevel logLevel() const { return _logLevel; }
-    bool interactive() const { return _interactive; }
-
-    bool valid() const;
-
-    static const char* usage();
-
-private:
-    int _port = -1;
-    std::string _host;
-    LogLevel _logLevel = LL_INFO;
-    bool _interactive = true;
-
-private:
-    int setLogLevel(const char* arg);
-};
+int main(int argc, char* argv[]) {
+    (void)argc;
+    (void)argv;
+    std::cout << "Hello, world!" << std::endl;
+    return 0;
+}

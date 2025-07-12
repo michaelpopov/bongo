@@ -1,5 +1,6 @@
 .gitignore
 utest
+http_perf
 *.d
 *.o
 *.a
