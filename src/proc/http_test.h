@@ -1,5 +1,5 @@
 /**********************************************
-   File:   mirror_test.h
+   File:   http_test.h
 
    Copyright 2025 Michael Popov
 
@@ -25,46 +25,25 @@
 namespace bongo {
 
 /***************************
- * Request / Response
- */
-struct MirrorRequest : public RequestBase {
-    std::string input;
-};
-
-struct MirrorResponse : public ResponseBase {
-    std::string output;
-};
-
-/***************************
  * Session
  */
-class MirrorSession : public SessionBase {
+class HttpSession : public SessionBase {
 public:
-    MirrorSession();
-    ProcessingStatus sendResponse(const ResponseBase& response) override;
-    void setHeaderDelimiter();
-
-    static std::string makeMirrorPacketWithVarHeader(const std::string& str);
-    static std::string parseOutput(Buffer buf, size_t& size);
+    HttpSession();
+    static const std::string& getSimpleHttpResponse();
 
 protected:
+    ProcessingStatus sendResponse(const ResponseBase& response) override;
     size_t parseMessageSize(Buffer header) override;
     std::optional<RequestBase*> parseMessage(const InputMessagePtr& msg) override;
-private:
-    static const std::string HeaderDelimiter;
-private:
-    size_t parseMessageSizeFixedHeader(Buffer header);
-    static size_t parseMessageSizeVariableHeader(Buffer header, size_t& size);
-    ProcessingStatus sendResponseFixedHeader(const MirrorResponse& resp);
-    ProcessingStatus sendResponseVariableHeader(const MirrorResponse& resp);
 };
 
 /***************************
  * Processor
  */
-class MirrorProcessor : public ProcessorBase {
+class HttpProcessor : public ProcessorBase {
 public:
-    MirrorProcessor(SessionsQueue* sessionsQueue, ProcessorStats* stats = nullptr)
+    HttpProcessor(SessionsQueue* sessionsQueue, ProcessorStats* stats = nullptr)
       : ProcessorBase(sessionsQueue, stats) {}
 
 protected:
@@ -74,6 +53,6 @@ protected:
 /***************************
  * ThreadPool
  */
-using MirrorSingleThreadPool = ThreadPool<MirrorProcessor, 1>;
+using HttpSingleThreadPool = ThreadPool<HttpProcessor, 1>;
 
 } // namespace bongo

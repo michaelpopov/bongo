@@ -58,7 +58,7 @@ ProcessingStatus MirrorSession::sendResponseFixedHeader(const MirrorResponse& re
 }
 
 ProcessingStatus MirrorSession::sendResponseVariableHeader(const MirrorResponse& resp) {
-    const std::string output = makeInputMirrorVarHeader(resp.output);
+    const std::string output = makeMirrorPacketWithVarHeader(resp.output);
     Buffer dest = _writeBuf.getAvailable(output.length());
     memcpy(dest.ptr, output.data(), output.length());
     _writeBuf.update(output.length());
@@ -91,7 +91,7 @@ size_t MirrorSession::parseMessageSizeVariableHeader(Buffer header, size_t& head
 
     header.ptr[endOfValuePos] = '\0';
     auto restoreHeader = std::experimental::scope_exit([&]() {
-        header.ptr[endOfValuePos] = '\r';
+        header.ptr[endOfValuePos] = HeaderDelimiter[0];
     });
 
     char* endptr = nullptr;
@@ -112,7 +112,7 @@ std::optional<RequestBase*> MirrorSession::parseMessage(const InputMessagePtr& m
     return req;
 }
 
-std::string MirrorSession::makeInputMirrorVarHeader(const std::string& str) {
+std::string MirrorSession::makeMirrorPacketWithVarHeader(const std::string& str) {
     const uint32_t len = str.length();
     char buffer[64];
     snprintf(buffer, sizeof(buffer)-1, "%u", len);
@@ -124,6 +124,7 @@ std::string MirrorSession::makeInputMirrorVarHeader(const std::string& str) {
     return result;
 }
 
+// For testing purposes. Executed on the test thread.
 std::string MirrorSession::parseOutput(Buffer buf, size_t& size) {
     size_t headerSize = 0;
     size_t bodySize = parseMessageSizeVariableHeader(buf, headerSize);

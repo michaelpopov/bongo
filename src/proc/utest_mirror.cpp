@@ -168,7 +168,7 @@ TEST(SESSION, MirrorVarHeaderSize) {
         NotificationBase* msg = nullptr;
         auto cleanupMsg = std::experimental::scope_exit([&]() { delete msg; });
 
-        const std::string requestStr = MirrorSession::makeInputMirrorVarHeader(inputStr);
+        const std::string requestStr = MirrorSession::makeMirrorPacketWithVarHeader(inputStr);
         Buffer readBuffer = session->getReadBuffer(requestStr.length());
         memcpy(readBuffer.ptr, requestStr.data(), requestStr.length());
         session->updateReadBuffer(requestStr.length());
